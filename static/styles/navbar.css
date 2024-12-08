@@ -1,0 +1,49 @@
+.navbar {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding: 0.5rem 0;
+  background-color: #007bff !important;
+}
+
+.navbar-brand {
+  font-size: 1.4rem;
+  font-weight: 600;
+}
+
+.nav-link {
+  position: relative;
+  padding: 0.5rem 1rem !important;
+  transition: color 0.2s;
+}
+
+.nav-link:after {
+  content: "";
+  position: absolute;
+  width: 0;
+  height: 2px;
+  bottom: 0;
+  left: 50%;
+  background-color: #fff;
+  transition: all 0.3s;
+}
+
+.nav-link:hover:after {
+  width: 80%;
+  left: 10%;
+}
+
+.navbar-nav .nav-link.active:after {
+  width: 80%;
+  left: 10%;
+}
+
+.navbar-nav .nav-item.nav-link {
+  margin: 0 0.5rem;
+}
+
+.bg-transparent.nav-link {
+  cursor: pointer;
+}
+
+.bg-transparent.nav-link:hover {
+  text-decoration: underline;
+}

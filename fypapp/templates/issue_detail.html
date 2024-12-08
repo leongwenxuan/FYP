@@ -1,0 +1,234 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ issue.title }}{% endblock %}
+
+{% block extra_head %}
+<script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}"></script>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/">Home</a></li>
+            <li class="breadcrumb-item"><a href="/issues">Issues</a></li>
+            <li class="breadcrumb-item active">{{ issue.title }}</li>
+        </ol>
+    </nav>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <h2 class="card-title mb-0">{{ issue.title }}</h2>
+                        <span class="priority-badge">{{ issue.get_priority_display }}</span>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <p class="text-muted mb-2">
+                            <i class="fas fa-map-marker-alt me-2"></i>{{ issue.location }}
+                        </p>
+                        <p class="text-muted mb-2">
+                            <i class="fas fa-user me-2"></i>Reported by {{ issue.reported_by.username }}
+                            <span class="mx-2">•</span>
+                            <i class="fas fa-clock me-2"></i>{{ issue.created_at|timesince }} ago
+                        </p>
+                    </div>
+
+                    {% if issue.image %}
+                    <div class="mb-4">
+                        <img src="{{ issue.image.url }}" alt="Issue Image" class="img-fluid rounded">
+                    </div>
+                    {% endif %}
+
+                    <p class="card-text">{{ issue.description }}</p>
+
+                    <div class="d-flex align-items-center mt-4">
+                        <button id="upvoteBtn" class="btn btn-outline-primary me-2" onclick="toggleUpvote()">
+                            <i class="fas fa-thumbs-up me-1"></i>
+                            <span id="upvoteCount">{{ issue.upvote_count }}</span> Upvotes
+                        </button>
+                        <span class="text-muted">Status: {{ issue.status }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Comments Section -->
+            <div class="card">
+                <div class="card-body">
+                    <h4 class="card-title mb-4">Comments</h4>
+                    
+                    {% if user.is_authenticated %}
+                    <form id="commentForm" class="mb-4">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <textarea class="form-control" id="commentContent" rows="3" placeholder="Add a comment..." required></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Post Comment</button>
+                    </form>
+                    {% else %}
+                    <div class="alert alert-info">
+                        Please <a href="{% url 'login' %}">login</a> to add comments.
+                    </div>
+                    {% endif %}
+
+                    <div id="commentsList" class="comment-section">
+                        {% for comment in issue.comments.all %}
+                        <div class="d-flex mb-3">
+                            <div class="flex-shrink-0">
+                                <i class="fas fa-user-circle fa-2x text-muted"></i>
+                            </div>
+                            <div class="flex-grow-1 ms-3">
+                                <div class="d-flex justify-content-between">
+                                    <h6 class="mb-1">{{ comment.user.username }}</h6>
+                                    <small class="text-muted">{{ comment.created_at|timesince }} ago</small>
+                                </div>
+                                <p class="mb-0">{{ comment.content }}</p>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <p class="text-muted text-center">No comments yet.</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title">Location</h5>
+                    <div id="map" style="height: 300px;" class="mb-3"></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Similar Issues Nearby</h5>
+                    <div id="nearbyIssues">
+                        <!-- Nearby issues will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let map;
+let marker;
+
+function initMap() {
+    const location = {
+        lat: parseFloat('{{ issue.latitude }}'),
+        lng: parseFloat('{{ issue.longitude }}')
+    };
+    
+    map = new google.maps.Map(document.getElementById('map'), {
+        center: location,
+        zoom: 15
+    });
+
+    marker = new google.maps.Marker({
+        position: location,
+        map: map,
+        title: '{{ issue.title }}',
+        icon: getPriorityMarkerIcon({{ issue.priority }})
+    });
+
+    loadNearbyIssues(location.lat, location.lng);
+}
+
+function getPriorityMarkerIcon(priority) {
+    const icons = {
+        1: 'https://maps.google.com/mapfiles/ms/icons/green-dot.png',
+        2: 'https://maps.google.com/mapfiles/ms/icons/yellow-dot.png',
+        3: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png',
+        4: 'https://maps.google.com/mapfiles/ms/icons/purple-dot.png'
+    };
+    return icons[priority] || icons[1];
+}
+
+function loadNearbyIssues(lat, lng) {
+    axios.get(`/api/issues/nearby/?latitude=${lat}&longitude=${lng}&radius=1`)
+        .then(response => {
+            const issues = response.data.filter(issue => issue.id !== {{ issue.id }});
+            const nearbyList = document.getElementById('nearbyIssues');
+            
+            if (issues.length === 0) {
+                nearbyList.innerHTML = '<p class="text-muted text-center">No similar issues nearby.</p>';
+                return;
+            }
+
+            nearbyList.innerHTML = issues.slice(0, 5).map(issue => `
+                <a href="/issues/${issue.id}" class="list-group-item list-group-item-action">
+                    <div class="d-flex w-100 justify-content-between">
+                        <h6 class="mb-1">${issue.title}</h6>
+                        <small class="text-muted">${getPriorityBadge(issue.priority)}</small>
+                    </div>
+                    <small class="text-muted">
+                        <i class="fas fa-thumbs-up me-1"></i>${issue.upvote_count} upvotes
+                    </small>
+                </a>
+            `).join('');
+        })
+        .catch(error => console.error('Error loading nearby issues:', error));
+}
+
+function getPriorityBadge(priority) {
+    const badges = {
+        1: '<span class="badge bg-success">Low</span>',
+        2: '<span class="badge bg-warning text-dark">Medium</span>',
+        3: '<span class="badge bg-danger">High</span>',
+        4: '<span class="badge bg-danger">Critical</span>'
+    };
+    return badges[priority] || '';
+}
+
+async function toggleUpvote() {
+    try {
+        const response = await axios.post('/api/issues/{{ issue.id }}/upvote/');
+        const upvoteBtn = document.getElementById('upvoteBtn');
+        const upvoteCount = document.getElementById('upvoteCount');
+        
+        if (response.data.status === 'upvoted') {
+            upvoteBtn.classList.add('active');
+        } else {
+            upvoteBtn.classList.remove('active');
+        }
+        
+        // Refresh the upvote count
+        const issueResponse = await axios.get('/api/issues/{{ issue.id }}/');
+        upvoteCount.textContent = issueResponse.data.upvote_count;
+    } catch (error) {
+        console.error('Error toggling upvote:', error);
+        alert('Error updating upvote. Please try again.');
+    }
+}
+
+document.getElementById('commentForm')?.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const content = document.getElementById('commentContent').value;
+    
+    try {
+        await axios.post('/api/issues/{{ issue.id }}/comments/', { content });
+        window.location.reload();
+    } catch (error) {
+        console.error('Error posting comment:', error);
+        alert('Error posting comment. Please try again.');
+    }
+});
+
+// Initialize map when page loads
+window.addEventListener('load', initMap);
+
+// Check if user has upvoted
+{% if user.is_authenticated and issue.has_upvoted %}
+document.getElementById('upvoteBtn').classList.add('active');
+{% endif %}
+</script>
+{% endblock %} 

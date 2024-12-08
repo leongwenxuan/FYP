@@ -1,0 +1,376 @@
+{% extends 'base.html' %}
+
+{% block title %}All Issues{% endblock %}
+
+{% block extra_head %}
+<script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}"></script>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Accessibility Issues</h2>
+        {% if user.is_authenticated %}
+            <a href="{% url 'report_issue' %}" class="btn btn-primary">
+                <i class="fas fa-plus me-2"></i>Report New Issue
+            </a>
+        {% endif %}
+    </div>
+
+    <div class="row">
+        <div class="col-md-4 mb-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title mb-3">Filters</h5>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Priority</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value="4" id="priorityCritical" checked>
+                            <label class="form-check-label" for="priorityCritical">
+                                Critical
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value="3" id="priorityHigh" checked>
+                            <label class="form-check-label" for="priorityHigh">
+                                High
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value="2" id="priorityMedium" checked>
+                            <label class="form-check-label" for="priorityMedium">
+                                Medium
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value="1" id="priorityLow" checked>
+                            <label class="form-check-label" for="priorityLow">
+                                Low
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Sort By</label>
+                        <select class="form-select" id="sortBy">
+                            <option value="priority">Priority (High to Low)</option>
+                            <option value="upvotes">Most Upvoted</option>
+                            <option value="recent">Most Recent</option>
+                            <option value="nearby">Nearby First</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Status</label>
+                        <select class="form-select" id="status">
+                            <option value="all">All</option>
+                            <option value="Open">Open</option>
+                            <option value="In Progress">In Progress</option>
+                            <option value="Resolved">Resolved</option>
+                        </select>
+                    </div>
+
+                    <button class="btn btn-primary w-100" onclick="applyFilters()">
+                        Apply Filters
+                    </button>
+                </div>
+            </div>
+
+            <div class="card mt-4">
+                <div class="card-body">
+                    <h5 class="card-title">Location</h5>
+                    <div id="map" style="height: 300px;"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-body">
+                    <div class="input-group mb-4">
+                        <input type="text" class="form-control" id="searchInput" placeholder="Search issues...">
+                        <button class="btn btn-outline-secondary" type="button" onclick="applyFilters()">
+                            <i class="fas fa-search"></i>
+                        </button>
+                    </div>
+
+                    <div id="issuesList">
+                        <!-- Issues will be loaded here -->
+                    </div>
+
+                    <div class="text-center mt-4">
+                        <button class="btn btn-outline-primary" id="loadMoreBtn" onclick="loadMore()" style="display: none;">
+                            Load More
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let map;
+let markers = [];
+let currentPage = 1;
+let hasMore = false;
+let userLocation = null;
+
+function initMap() {
+    // Default to Singapore coordinates
+    const defaultLocation = { lat: 1.3521, lng: 103.8198 };
+    
+    map = new google.maps.Map(document.getElementById('map'), {
+        center: defaultLocation,
+        zoom: 12
+    });
+
+    // Try to get user's location
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            position => {
+                userLocation = {
+                    lat: position.coords.latitude,
+                    lng: position.coords.longitude
+                };
+                
+                map.setCenter(userLocation);
+                
+                // Add user marker
+                new google.maps.Marker({
+                    position: userLocation,
+                    map: map,
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 10,
+                        fillColor: '#4285F4',
+                        fillOpacity: 1,
+                        strokeColor: '#ffffff',
+                        strokeWeight: 2
+                    },
+                    title: 'Your Location'
+                });
+
+                // Load issues with user location
+                loadIssues();
+            },
+            () => {
+                loadIssues();
+            }
+        );
+    } else {
+        loadIssues();
+    }
+}
+
+function loadIssues(append = false) {
+    if (!append) {
+        currentPage = 1;
+    }
+
+    const priorities = Array.from(document.querySelectorAll('input[type="checkbox"]:checked'))
+        .map(cb => cb.value);
+    
+    const sortBy = document.getElementById('sortBy').value;
+    const status = document.getElementById('status').value;
+    const search = document.getElementById('searchInput').value;
+
+    let url = `/api/issues/?page=${currentPage}`;
+    
+    if (priorities.length) {
+        url += `&priority__in=${priorities.join(',')}`;
+    }
+    
+    if (status !== 'all') {
+        url += `&status=${status}`;
+    }
+    
+    if (search) {
+        url += `&search=${encodeURIComponent(search)}`;
+    }
+
+    if (sortBy === 'nearby' && userLocation) {
+        url += `&latitude=${userLocation.lat}&longitude=${userLocation.lng}`;
+    }
+
+    axios.get(url)
+        .then(response => {
+            const issues = response.data;
+            
+            if (!append) {
+                clearMarkers();
+                document.getElementById('issuesList').innerHTML = '';
+            }
+
+            issues.forEach(issue => {
+                addIssueToList(issue);
+                addMarkerToMap(issue);
+            });
+
+            hasMore = issues.length === 10;  // Assuming page size is 10
+            document.getElementById('loadMoreBtn').style.display = hasMore ? 'inline-block' : 'none';
+        })
+        .catch(error => console.error('Error loading issues:', error));
+}
+
+function addIssueToList(issue) {
+    const issuesList = document.getElementById('issuesList');
+    
+    const issueCard = document.createElement('div');
+    issueCard.className = 'card mb-3 issue-card';
+    issueCard.innerHTML = `
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start">
+                <h5 class="card-title mb-1">
+                    <a href="/issues/${issue.id}" class="text-decoration-none text-dark">
+                        ${issue.title}
+                    </a>
+                </h5>
+                <span class="priority-badge">${getPriorityBadge(issue.priority)}</span>
+            </div>
+            
+            <p class="text-muted small mb-2">
+                <i class="fas fa-map-marker-alt me-1"></i>${issue.location}
+            </p>
+            
+            <p class="card-text text-truncate mb-2">${issue.description}</p>
+            
+            <div class="d-flex justify-content-between align-items-center">
+                <div class="text-muted small">
+                    <i class="fas fa-user me-1"></i>${issue.reported_by.username}
+                    <span class="mx-2">•</span>
+                    <i class="fas fa-clock me-1"></i>${timeAgo(new Date(issue.created_at))}
+                </div>
+                <div>
+                    <span class="me-3">
+                        <i class="fas fa-thumbs-up me-1"></i>${issue.upvote_count}
+                    </span>
+                    <span class="badge ${getStatusBadgeClass(issue.status)}">
+                        ${issue.status}
+                    </span>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    issuesList.appendChild(issueCard);
+}
+
+function addMarkerToMap(issue) {
+    const marker = new google.maps.Marker({
+        position: { 
+            lat: parseFloat(issue.latitude), 
+            lng: parseFloat(issue.longitude) 
+        },
+        map: map,
+        title: issue.title,
+        icon: getPriorityMarkerIcon(issue.priority)
+    });
+
+    const infoWindow = new google.maps.InfoWindow({
+        content: `
+            <div>
+                <h6>${issue.title}</h6>
+                <p class="mb-1">${issue.description}</p>
+                <a href="/issues/${issue.id}">View Details</a>
+            </div>
+        `
+    });
+
+    marker.addListener('click', () => {
+        infoWindow.open(map, marker);
+    });
+
+    markers.push(marker);
+}
+
+function clearMarkers() {
+    markers.forEach(marker => marker.setMap(null));
+    markers = [];
+}
+
+function getPriorityBadge(priority) {
+    const badges = {
+        1: '<span class="badge bg-success">Low</span>',
+        2: '<span class="badge bg-warning text-dark">Medium</span>',
+        3: '<span class="badge bg-danger">High</span>',
+        4: '<span class="badge bg-danger">Critical</span>'
+    };
+    return badges[priority] || '';
+}
+
+function getPriorityMarkerIcon(priority) {
+    const icons = {
+        1: 'https://maps.google.com/mapfiles/ms/icons/green-dot.png',
+        2: 'https://maps.google.com/mapfiles/ms/icons/yellow-dot.png',
+        3: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png',
+        4: 'https://maps.google.com/mapfiles/ms/icons/purple-dot.png'
+    };
+    return icons[priority] || icons[1];
+}
+
+function getStatusBadgeClass(status) {
+    const classes = {
+        'Open': 'bg-danger',
+        'In Progress': 'bg-warning text-dark',
+        'Resolved': 'bg-success'
+    };
+    return classes[status] || 'bg-secondary';
+}
+
+function timeAgo(date) {
+    const seconds = Math.floor((new Date() - date) / 1000);
+    
+    let interval = Math.floor(seconds / 31536000);
+    if (interval > 1) return interval + ' years ago';
+    if (interval === 1) return '1 year ago';
+    
+    interval = Math.floor(seconds / 2592000);
+    if (interval > 1) return interval + ' months ago';
+    if (interval === 1) return '1 month ago';
+    
+    interval = Math.floor(seconds / 86400);
+    if (interval > 1) return interval + ' days ago';
+    if (interval === 1) return '1 day ago';
+    
+    interval = Math.floor(seconds / 3600);
+    if (interval > 1) return interval + ' hours ago';
+    if (interval === 1) return '1 hour ago';
+    
+    interval = Math.floor(seconds / 60);
+    if (interval > 1) return interval + ' minutes ago';
+    if (interval === 1) return '1 minute ago';
+    
+    return 'just now';
+}
+
+function applyFilters() {
+    loadIssues(false);
+}
+
+function loadMore() {
+    currentPage++;
+    loadIssues(true);
+}
+
+// Initialize map when page loads
+window.addEventListener('load', initMap);
+
+// Add event listeners for real-time filtering
+document.getElementById('searchInput').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        applyFilters();
+    }
+});
+
+// Debounce function for search input
+let searchTimeout;
+document.getElementById('searchInput').addEventListener('input', function() {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(applyFilters, 500);
+});
+</script>
+{% endblock %} 

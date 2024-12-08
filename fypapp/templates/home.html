@@ -1,0 +1,227 @@
+{% extends 'base.html' %}
+
+{% block title %}Home{% endblock %}
+
+{% block extra_head %}
+<script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&libraries=places"></script>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-6">
+        <h1>Welcome to Elderly Friendly SG</h1>
+        <p class="lead">Help make Singapore more accessible for the elderly by reporting and tracking accessibility issues.</p>
+        {% if user.is_authenticated %}
+            <a href="/report" class="btn btn-primary btn-lg">Report an Issue</a>
+        {% else %}
+            <a href="{% url 'login' %}" class="btn btn-primary btn-lg">Login to Report Issues</a>
+        {% endif %}
+    </div>
+    <div class="col-md-6">
+        <div id="map" class="shadow"></div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header bg-primary text-white">
+                <h5 class="card-title mb-0">Nearby Issues</h5>
+            </div>
+            <div class="card-body">
+                <div id="nearby-issues" class="list-group list-group-flush">
+                    <!-- Nearby issues will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header bg-primary text-white">
+                <h5 class="card-title mb-0">Top Priority Issues</h5>
+            </div>
+            <div class="card-body">
+                <div id="priority-issues" class="list-group list-group-flush">
+                    <!-- Priority issues will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let map;
+let userMarker;
+let issueMarkers = [];
+
+function initMap() {
+    // Default to Singapore coordinates
+    const defaultLocation = { lat: 1.3521, lng: 103.8198 };
+    
+    map = new google.maps.Map(document.getElementById('map'), {
+        center: defaultLocation,
+        zoom: 12,
+        styles: [
+            {
+                featureType: 'poi',
+                elementType: 'labels',
+                stylers: [{ visibility: 'off' }]
+            }
+        ]
+    });
+
+    // Try to get user's location
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            position => {
+                const userLocation = {
+                    lat: position.coords.latitude,
+                    lng: position.coords.longitude
+                };
+                
+                map.setCenter(userLocation);
+                
+                // Add user marker
+                userMarker = new google.maps.Marker({
+                    position: userLocation,
+                    map: map,
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 10,
+                        fillColor: '#4285F4',
+                        fillOpacity: 1,
+                        strokeColor: '#ffffff',
+                        strokeWeight: 2
+                    },
+                    title: 'Your Location'
+                });
+
+                // Load nearby issues
+                loadNearbyIssues(userLocation.lat, userLocation.lng);
+            },
+            () => {
+                loadNearbyIssues(defaultLocation.lat, defaultLocation.lng);
+            }
+        );
+    }
+
+    loadPriorityIssues();
+}
+
+function loadNearbyIssues(lat, lng) {
+    axios.get(`/api/issues/nearby/?latitude=${lat}&longitude=${lng}&radius=5`)
+        .then(response => {
+            const issues = response.data;
+            const nearbyList = document.getElementById('nearby-issues');
+            nearbyList.innerHTML = '';
+
+            // Clear existing markers
+            issueMarkers.forEach(marker => marker.setMap(null));
+            issueMarkers = [];
+
+            issues.forEach(issue => {
+                // Add to list
+                nearbyList.innerHTML += `
+                    <a href="/issues/${issue.id}" class="list-group-item list-group-item-action">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">${issue.title}</h6>
+                            <small class="text-muted">${getPriorityBadge(issue.priority)}</small>
+                        </div>
+                        <p class="mb-1 small">${issue.location}</p>
+                        <small class="text-muted">
+                            <i class="fas fa-thumbs-up me-1"></i>${issue.upvote_count} upvotes
+                        </small>
+                    </a>
+                `;
+
+                // Add marker to map
+                const marker = new google.maps.Marker({
+                    position: { lat: parseFloat(issue.latitude), lng: parseFloat(issue.longitude) },
+                    map: map,
+                    title: issue.title,
+                    icon: {
+                        url: getPriorityMarkerIcon(issue.priority),
+                        scaledSize: new google.maps.Size(30, 30)
+                    }
+                });
+
+                const infoWindow = new google.maps.InfoWindow({
+                    content: `
+                        <div>
+                            <h6>${issue.title}</h6>
+                            <p>${issue.description}</p>
+                            <a href="/issues/${issue.id}">View Details</a>
+                        </div>
+                    `
+                });
+
+                marker.addListener('click', () => {
+                    infoWindow.open(map, marker);
+                });
+
+                issueMarkers.push(marker);
+            });
+
+            if (issues.length === 0) {
+                nearbyList.innerHTML = '<div class="text-center p-3">No nearby issues found</div>';
+            }
+        })
+        .catch(error => console.error('Error loading nearby issues:', error));
+}
+
+function loadPriorityIssues() {
+    axios.get('/api/issues/top_priority/')
+        .then(response => {
+            const issues = response.data;
+            const priorityList = document.getElementById('priority-issues');
+            priorityList.innerHTML = '';
+
+            issues.forEach(issue => {
+                priorityList.innerHTML += `
+                    <a href="/issues/${issue.id}" class="list-group-item list-group-item-action">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">${issue.title}</h6>
+                            <small class="text-muted">${getPriorityBadge(issue.priority)}</small>
+                        </div>
+                        <p class="mb-1 small">${issue.location}</p>
+                        <small class="text-muted">
+                            <i class="fas fa-thumbs-up me-1"></i>${issue.upvote_count} upvotes
+                        </small>
+                    </a>
+                `;
+            });
+
+            if (issues.length === 0) {
+                priorityList.innerHTML = '<div class="text-center p-3">No issues found</div>';
+            }
+        })
+        .catch(error => console.error('Error loading priority issues:', error));
+}
+
+function getPriorityBadge(priority) {
+    const badges = {
+        1: '<span class="badge bg-success">Low</span>',
+        2: '<span class="badge bg-warning text-dark">Medium</span>',
+        3: '<span class="badge bg-danger">High</span>',
+        4: '<span class="badge bg-danger">Critical</span>'
+    };
+    return badges[priority] || '';
+}
+
+function getPriorityMarkerIcon(priority) {
+    const icons = {
+        1: 'https://maps.google.com/mapfiles/ms/icons/green-dot.png',
+        2: 'https://maps.google.com/mapfiles/ms/icons/yellow-dot.png',
+        3: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png',
+        4: 'https://maps.google.com/mapfiles/ms/icons/purple-dot.png'
+    };
+    return icons[priority] || icons[1];
+}
+
+// Initialize map when page loads
+window.addEventListener('load', initMap);
+</script>
+{% endblock %}

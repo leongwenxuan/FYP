@@ -1,0 +1,214 @@
+{% extends 'base.html' %}
+
+{% block title %}Report Issue{% endblock %}
+
+{% block extra_head %}
+<script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&libraries=places"></script>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h2 class="mb-4">Report Accessibility Issue</h2>
+    
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-body">
+                    <form id="issueForm" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label for="title" class="form-label">Title</label>
+                            <input type="text" class="form-control" id="title" name="title" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="description" class="form-label">Description</label>
+                            <textarea class="form-control" id="description" name="description" rows="4" required></textarea>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="location" class="form-label">Location</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="location" name="location" required>
+                                <button type="button" class="btn btn-outline-primary" onclick="useCurrentLocation()">
+                                    <i class="fas fa-location-arrow"></i> Use My Location
+                                </button>
+                            </div>
+                            <input type="hidden" id="latitude" name="latitude">
+                            <input type="hidden" id="longitude" name="longitude">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="priority" class="form-label">Priority Level</label>
+                            <select class="form-select" id="priority" name="priority" required>
+                                <option value="1">Low</option>
+                                <option value="2">Medium</option>
+                                <option value="3">High</option>
+                                <option value="4">Critical</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="image" class="form-label">Upload Image (Optional)</label>
+                            <input type="file" class="form-control" id="image" name="image" accept="image/*">
+                            <div id="imagePreview" class="mt-2"></div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">Submit Report</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Location Preview</h5>
+                    <div id="map" style="height: 300px;" class="mb-3"></div>
+                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="useCurrentLocation()">
+                        <i class="fas fa-location-arrow me-1"></i> Use Current Location
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let map;
+let marker;
+let autocomplete;
+
+function initMap() {
+    // Default to Singapore coordinates
+    const defaultLocation = { lat: 1.3521, lng: 103.8198 };
+    
+    map = new google.maps.Map(document.getElementById('map'), {
+        center: defaultLocation,
+        zoom: 12
+    });
+
+    geocoder = new google.maps.Geocoder(); // Initialize the geocoder
+
+    marker = new google.maps.Marker({
+        map: map,
+        draggable: true
+    });
+
+    // Initialize the autocomplete
+    autocomplete = new google.maps.places.Autocomplete(
+        document.getElementById('location'),
+        { componentRestrictions: { country: 'sg' } }
+    );
+
+    // Update marker when place is selected
+    autocomplete.addListener('place_changed', () => {
+        const place = autocomplete.getPlace();
+        if (!place.geometry) return;
+
+        updateMarkerPosition(place.geometry.location);
+    });
+
+    // Update coordinates when marker is dragged
+    marker.addListener('dragend', () => {
+        const position = marker.getPosition();
+        updateFormCoordinates(position);
+        reverseGeocode(position);
+    });
+}
+
+function updateMarkerPosition(location) {
+    marker.setPosition(location);
+    map.setCenter(location);
+    map.setZoom(16);
+    updateFormCoordinates(location);
+}
+
+function updateFormCoordinates(location) {
+    document.getElementById('latitude').value = location.lat();
+    document.getElementById('longitude').value = location.lng();
+}
+
+function reverseGeocode(position) {
+    geocoder.geocode({ location: position }, (results, status) => {
+        if (status === 'OK' && results[0]) {
+            document.getElementById('location').value = results[0].formatted_address;
+        }
+    });
+}
+
+function useCurrentLocation() {
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            position => {
+                const location = {
+                    lat: position.coords.latitude,
+                    lng: position.coords.longitude
+                };
+                
+                // Update marker and map
+                updateMarkerPosition(new google.maps.LatLng(location.lat, location.lng));
+                
+                // Get address for the location
+                geocoder.geocode({ location }, (results, status) => {
+                    if (status === 'OK' && results[0]) {
+                        document.getElementById('location').value = results[0].formatted_address;
+                    } else {
+                        console.error('Geocoder failed:', status);
+                        document.getElementById('location').value = `${location.lat}, ${location.lng}`;
+                    }
+                });
+            },
+            error => {
+                console.error('Error getting location:', error);
+                alert('Unable to get your location. Please try again or enter it manually.');
+            }
+        );
+    } else {
+        alert('Geolocation is not supported by your browser.');
+    }
+}
+
+// Handle image preview
+document.getElementById('image').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const preview = document.getElementById('imagePreview');
+            preview.innerHTML = `
+                <img src="${e.target.result}" class="img-fluid rounded" style="max-height: 200px">
+            `;
+        }
+        reader.readAsDataURL(file);
+    }
+});
+
+// Handle form submission
+document.getElementById('issueForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    const formData = new FormData(this);
+    
+    try {
+        const response = await axios.post('/api/issues/', formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            }
+        });
+        
+        // Redirect to the issue detail page
+        window.location.href = `/issues/${response.data.id}`;
+    } catch (error) {
+        console.error('Error submitting issue:', error);
+        alert('Error submitting issue. Please try again.');
+    }
+});
+
+// Initialize map when page loads
+window.addEventListener('load', initMap);
+</script>
+{% endblock %} 

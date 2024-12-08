@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elderly Friendly SG - {% block title %}{% endblock %}</title>
+    {% load bootstrap5 %}
+    {% bootstrap_css %}
+    {% bootstrap_javascript %}
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+        .issue-card {
+            transition: transform 0.2s;
+            cursor: pointer;
+        }
+        .issue-card:hover {
+            transform: translateY(-5px);
+        }
+        .priority-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+        }
+        .upvote-btn {
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+        .upvote-btn:hover {
+            color: #0d6efd;
+        }
+        .upvoted {
+            color: #0d6efd;
+        }
+        #map {
+            height: 400px;
+            width: 100%;
+            border-radius: 8px;
+        }
+        .comment-section {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    {% include 'navbar.html' %}
+
+    <main class="container py-4">
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+        
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="bg-light py-3 mt-5">
+        <div class="container text-center">
+            <p class="mb-0">&copy; 2023 Elderly Friendly SG. All rights reserved.</p>
+        </div>
+    </footer>
+
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html> 
