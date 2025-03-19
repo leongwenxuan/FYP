@@ -91,7 +91,7 @@ function initMap() {
         zoom: 12
     });
 
-    geocoder = new google.maps.Geocoder(); // Initialize the geocoder
+    geocoder = new google.maps.Geocoder(); 
 
     marker = new google.maps.Marker({
         map: map,
@@ -128,9 +128,10 @@ function updateMarkerPosition(location) {
 }
 
 function updateFormCoordinates(location) {
-    document.getElementById('latitude').value = location.lat();
-    document.getElementById('longitude').value = location.lng();
+    document.getElementById('latitude').value = Number(location.lat()).toFixed(6);
+    document.getElementById('longitude').value = Number(location.lng()).toFixed(6);
 }
+
 
 function reverseGeocode(position) {
     geocoder.geocode({ location: position }, (results, status) => {
@@ -192,20 +193,33 @@ document.getElementById('issueForm').addEventListener('submit', async function(e
     e.preventDefault();
 
     const formData = new FormData(this);
+
+        // Debug logs
+        console.log("Form Data Contents:");
+    for (let pair of formData.entries()) {
+        console.log(pair[0], pair[1]);
+    }
+    
     
     try {
+        const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
         const response = await axios.post('/api/issues/', formData, {
             headers: {
-                'Content-Type': 'multipart/form-data'
+                'Content-Type': 'multipart/form-data',
+                'X-CSRFToken': csrftoken
             }
         });
         
         // Redirect to the issue detail page
         window.location.href = `/issues/${response.data.id}`;
     } catch (error) {
-        console.error('Error submitting issue:', error);
-        alert('Error submitting issue. Please try again.');
+    console.error('Error submitting issue:', error);
+    if (error.response) {
+        console.error('Server Error Details:', error.response.data);
     }
+    alert('Error submitting issue. Please try again.');
+}
 });
 
 // Initialize map when page loads

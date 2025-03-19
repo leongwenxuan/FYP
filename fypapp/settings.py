@@ -82,12 +82,8 @@ WSGI_APPLICATION = 'fypapp.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'fyp_project',
-        'USER': 'postgres',
-        'PASSWORD': os.getenv('DB_PASSWORD'),  
-        'HOST': 'localhost',
-        'PORT': '5432',
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
 
