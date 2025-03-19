@@ -45,6 +45,7 @@
                     <p class="card-text">{{ issue.description }}</p>
 
                     <div class="d-flex align-items-center mt-4">
+                        {% csrf_token %} 
                         <button id="upvoteBtn" class="btn btn-outline-primary me-2" onclick="toggleUpvote()">
                             <i class="fas fa-thumbs-up me-1"></i>
                             <span id="upvoteCount">{{ issue.upvote_count }}</span> Upvotes
@@ -190,32 +191,40 @@ function getPriorityBadge(priority) {
 
 async function toggleUpvote() {
     try {
-        const response = await axios.post('/api/issues/{{ issue.id }}/upvote/');
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        const response = await axios.post('/api/issues/{{ issue.id }}/upvote/', {}, {
+            headers: {
+                'X-CSRFToken': csrfToken
+            }
+        });
+        
         const upvoteBtn = document.getElementById('upvoteBtn');
         const upvoteCount = document.getElementById('upvoteCount');
         
-        if (response.data.status === 'upvoted') {
+        upvoteCount.textContent = response.data.upvote_count;
+        if (response.data.has_upvoted) {
             upvoteBtn.classList.add('active');
         } else {
             upvoteBtn.classList.remove('active');
         }
-        
-        // Refresh the upvote count
-        const issueResponse = await axios.get('/api/issues/{{ issue.id }}/');
-        upvoteCount.textContent = issueResponse.data.upvote_count;
     } catch (error) {
         console.error('Error toggling upvote:', error);
-        alert('Error updating upvote. Please try again.');
     }
 }
 
 document.getElementById('commentForm')?.addEventListener('submit', async function(e) {
     e.preventDefault();
     
+
     const content = document.getElementById('commentContent').value;
     
     try {
-        await axios.post('/api/issues/{{ issue.id }}/comments/', { content });
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        await axios.post('/api/issues/{{ issue.id }}/comments/', { content }, {
+            headers: {
+                'X-CSRFToken': csrfToken
+            }
+        });
         window.location.reload();
     } catch (error) {
         console.error('Error posting comment:', error);

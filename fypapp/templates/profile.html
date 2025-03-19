@@ -1,0 +1,78 @@
+{% extends 'base.html' %}
+
+{% block title %}Profile - {{ user.username }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-body">
+                    <h2 class="card-title">{{ user.username }}'s Profile</h2>
+                    <p class="text-muted">Member since: {{ user.date_joined|date:"F j, Y" }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">Your Reported Issues</h5>
+                </div>
+                <div class="card-body">
+                    <div class="list-group">
+                        {% for issue in reported_issues %}
+                            <a href="{% url 'issue_detail' issue.pk %}" class="list-group-item list-group-item-action">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <h6 class="mb-1">{{ issue.title }}</h6>
+                                    <small class="text-muted">{{ issue.created_at|date:"M d, Y" }}</small>
+                                </div>
+                                <p class="mb-1 small">{{ issue.location }}</p>
+                                <small class="text-muted">
+                                    <span class="badge bg-{{ issue.priority|yesno:'danger,warning,success,danger' }}">
+                                        {{ issue.get_priority_display }}
+                                    </span>
+                                    <i class="fas fa-thumbs-up ms-2"></i> {{ issue.upvote_count }}
+                                </small>
+                            </a>
+                        {% empty %}
+                            <p class="text-center text-muted my-3">You haven't reported any issues yet.</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">Your Upvoted Issues</h5>
+                </div>
+                <div class="card-body">
+                    <div class="list-group">
+                        {% for issue in upvoted_issues %}
+                            <a href="{% url 'issue_detail' issue.pk %}" class="list-group-item list-group-item-action">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <h6 class="mb-1">{{ issue.title }}</h6>
+                                    <small class="text-muted">{{ issue.created_at|date:"M d, Y" }}</small>
+                                </div>
+                                <p class="mb-1 small">{{ issue.location }}</p>
+                                <small class="text-muted">
+                                    <span class="badge bg-{{ issue.priority|yesno:'danger,warning,success,danger' }}">
+                                        {{ issue.get_priority_display }}
+                                    </span>
+                                    <i class="fas fa-thumbs-up ms-2"></i> {{ issue.upvote_count }}
+                                </small>
+                            </a>
+                        {% empty %}
+                            <p class="text-center text-muted my-3">You haven't upvoted any issues yet.</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

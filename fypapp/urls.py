@@ -31,6 +31,8 @@ urlpatterns = [
     path('report/', views.report_issue, name='report_issue'),
     path('issues/', views.issue_list, name='issue_list'),
     path('issues/<int:pk>/', views.issue_detail, name='issue_detail'),
+    path('routermap/', views.routermap, name='routermap'),
+    path('profile/', views.profile, name='profile'),
     path('admin/', admin.site.urls),
     path('api/', include(router.urls)),
     path('api-auth/', include('rest_framework.urls')),

@@ -46,6 +46,14 @@ def issue_list(request):
     }
     return render(request, 'issue_list.html', context)
 
+def profile(request):
+    reported_issues = AccessibilityIssue.objects.filter(reported_by=request.user)
+    upvoted_issues = AccessibilityIssue.objects.filter(upvotes=request.user)    
+    return render(request, 'profile.html', {'reported_issues': reported_issues, 'upvoted_issues': upvoted_issues})
+
+def routermap(request):
+    return render(request, 'routermap.html')
+
 def issue_detail(request, pk):
     issue = get_object_or_404(AccessibilityIssue, pk=pk)
     has_upvoted = False
@@ -67,16 +75,32 @@ class AccessibilityIssueViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(reported_by=self.request.user)
 
-    @action(detail=True, methods=['POST'])
+    @action(detail=True, methods=['POST'], permission_classes=[IsAuthenticated])
     def upvote(self, request, pk=None):
-        issue = self.get_object()
-        if issue.upvotes.filter(id=request.user.id).exists():
-            issue.upvotes.remove(request.user)
-            return Response({'status': 'upvote removed'})
-        else:
-            issue.upvotes.add(request.user)
-            return Response({'status': 'upvoted'})
+        try:
+            issue = self.get_object()
+            if not issue:
+                return Response({'error': 'Issue not found'}, status=status.HTTP_404_NOT_FOUND)
 
+            if issue.upvotes.filter(id=request.user.id).exists():
+                issue.upvotes.remove(request.user)
+                message = 'upvote removed'
+            else:
+                issue.upvotes.add(request.user)
+                message = 'upvoted'
+            
+            serializer = self.get_serializer(issue, context={'request': request})
+            return Response({
+                'status': message,
+                'upvote_count': issue.upvote_count,
+                'has_upvoted': issue.upvotes.filter(id=request.user.id).exists()
+            })
+        except Exception as e:
+            return Response({
+                'error': str(e),
+                'type': type(e).__name__
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
     @action(detail=False, methods=['GET'])
     def nearby(self, request):
         user_lat = float(request.query_params.get('latitude', 0))

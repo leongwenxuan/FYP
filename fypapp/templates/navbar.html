@@ -18,11 +18,15 @@
                 <li class="nav-item">
                     <a class="nav-link" href="/report">Report Issue</a>
                 </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/routermap">Route Map</a>
+                </li>
 
             </ul>
             <div class="navbar-nav">
                 {% if user.is_authenticated %}
-                    <span class="nav-item nav-link">Welcome, {{ user.username }}</span>
+                    <!-- <a class="nav-item nav-link" action="{% url 'profile' %}">Welcome, {{ user.username }}</a> -->
+                     <a class="nav-item nav-link" href="{% url 'profile' %}">Welcome, {{ user.username }}</a>
                     <form method="post" action="{% url 'logout' %}" class="d-inline">
                         {% csrf_token %}
                         <button type="submit" class="nav-link border-0 bg-transparent">Logout</button>
