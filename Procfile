@@ -1,3 +1,1 @@
- web : gunicorn fypapp.wsgi
-
-
+web: gunicorn reportease.wsgi
