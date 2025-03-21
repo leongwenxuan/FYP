@@ -33,7 +33,13 @@
 
                         <div class="mb-3">
                             <label for="description" class="form-label">Description</label>
-                            <textarea class="form-control" id="description" name="description" rows="4" required></textarea>
+                            <div class="input-group">
+                                <textarea class="form-control" id="description" name="description" rows="4" required></textarea>
+                                <button type="button" class="btn btn-outline-primary" id="voiceInputBtn">
+                                    <i class="fas fa-microphone">Record</i>
+                                </button>
+                            </div>
+                            <div id="voiceStatus" class="form-text text-muted"></div>
                         </div>
 
                         <div class="mb-3">
@@ -239,6 +245,84 @@ document.getElementById('issueForm').addEventListener('submit', async function(e
     alert('Error submitting issue. Please try again.');
 }
 });
+
+// Voice input functionality
+let isRecording = false;
+let mediaRecorder;
+let audioChunks = [];
+
+document.getElementById('voiceInputBtn').addEventListener('click', toggleVoiceInput);
+
+async function toggleVoiceInput() {
+    const voiceBtn = document.getElementById('voiceInputBtn');
+    const statusDiv = document.getElementById('voiceStatus');
+    
+    if (!isRecording) {
+        // Start recording
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            statusDiv.textContent = "Listening... (Click again to stop)";
+            voiceBtn.classList.add('btn-danger');
+            voiceBtn.classList.remove('btn-outline-primary');
+            
+            mediaRecorder = new MediaRecorder(stream);
+            audioChunks = [];
+            
+            mediaRecorder.addEventListener('dataavailable', event => {
+                audioChunks.push(event.data);
+            });
+            
+            mediaRecorder.addEventListener('stop', async () => {
+                statusDiv.textContent = "Processing your voice input...";
+                
+                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                const formData = new FormData();
+                formData.append('audio', audioBlob);
+                
+                try {
+                    const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+                    const response = await axios.post('/api/transcribe-audio/', formData, {
+                        headers: {
+                            'Content-Type': 'multipart/form-data',
+                            'X-CSRFToken': csrftoken
+                        }
+                    });
+                    
+                    if (response.data.success) {
+                        // Fill form fields based on the structured data
+                        const result = response.data.result;
+                        
+                        if (result.title) document.getElementById('title').value = result.title;
+                        if (result.description) document.getElementById('description').value = result.description;
+                        if (result.location) document.getElementById('location').value = result.location;
+                        if (result.priority) document.getElementById('priority').value = result.priority;
+                        
+                        statusDiv.textContent = "Form populated from your voice input!";
+                    } else {
+                        statusDiv.textContent = "Error processing voice input. Please try again.";
+                    }
+                } catch (error) {
+                    console.error('Error processing audio:', error);
+                    statusDiv.textContent = "Error processing voice input. Please try again.";
+                }
+                
+                voiceBtn.classList.remove('btn-danger');
+                voiceBtn.classList.add('btn-outline-primary');
+            });
+            
+            mediaRecorder.start();
+            isRecording = true;
+        } catch (error) {
+            console.error('Error accessing microphone:', error);
+            statusDiv.textContent = "Error accessing microphone. Please check permissions.";
+        }
+    } else {
+        // Stop recording
+        mediaRecorder.stop();
+        mediaRecorder.stream.getTracks().forEach(track => track.stop());
+        isRecording = false;
+    }
+}
 
 // Initialize map when page loads
 window.addEventListener('load', initMap);
