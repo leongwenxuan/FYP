@@ -15,6 +15,10 @@ from math import cos, radians
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from django.conf import settings
+from rest_framework import filters
+import django_filters.rest_framework
+from django.db.models import Q
+from django.db import models
 
 def register(request):
     if request.method == 'POST':
@@ -108,6 +112,40 @@ class AccessibilityIssueViewSet(viewsets.ModelViewSet):
     serializer_class = AccessibilityIssueSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
     pagination_class = StandardResultsSetPagination
+
+    def get_queryset(self):
+        queryset = AccessibilityIssue.objects.all()
+        
+        # Filter by priority
+        priority_in = self.request.query_params.get('priority__in')
+        if priority_in:
+            priorities = priority_in.split(',')
+            queryset = queryset.filter(priority__in=priorities)
+        
+        # Filter by status
+        status = self.request.query_params.get('status')
+        if status and status != 'all':
+            queryset = queryset.filter(status=status)
+            
+        # Search functionality - using Q correctly
+        search = self.request.query_params.get('search')
+        if search:
+            queryset = queryset.filter(
+                Q(title__icontains=search) |
+                Q(description__icontains=search) |
+                Q(location__icontains=search)
+            )
+            
+        # Sorting
+        sort = self.request.query_params.get('sort')
+        if sort:
+            if sort == '-upvote_count':
+                # Special handling for upvote count sorting
+                queryset = queryset.annotate(votes=Count('upvotes')).order_by('-votes')
+            else:
+                queryset = queryset.order_by(sort)
+            
+        return queryset
 
     def perform_create(self, serializer):
         serializer.save(reported_by=self.request.user)
