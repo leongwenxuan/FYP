@@ -1,9 +1,13 @@
 {% load static %}
 <link rel="stylesheet" href="{% static 'styles/navbar.css' %}">
 
-<nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-    <div class="container">
-        <a class="navbar-brand" href="/">Elderly Friendly SG</a>
+<nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container">
+        <!-- <a class="navbar-brand" href="/">ReportEase</a> -->
+        {% load static %}
+        <a href="/">
+            <img src="{% static 'images/logo.png' %}" alt="ReportEase Logo" height="100" class="d-inline-block align-top me-2">
+        </a>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
             <span class="navbar-toggler-icon"></span>
         </button>
