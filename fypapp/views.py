@@ -2,6 +2,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.pagination import PageNumberPagination
 from django.db.models import Count
 from django.contrib.auth.models import User
 from django.contrib.auth.forms import UserCreationForm
@@ -52,7 +53,37 @@ def profile(request):
     return render(request, 'profile.html', {'reported_issues': reported_issues, 'upvoted_issues': upvoted_issues})
 
 def routermap(request):
-    return render(request, 'routermap.html')
+    issues = {
+        'critical': [],
+        'high': [],
+        'medium': [],
+        'low': []
+    }
+    
+    all_issues = AccessibilityIssue.objects.all()
+    for issue in all_issues:
+        issue_data = {
+            'id': issue.id,
+            'coords': [float(issue.longitude), float(issue.latitude)],
+            'title': issue.title,
+            'description': issue.description
+        }
+        
+        if issue.priority == 4:  # Critical
+            issues['critical'].append(issue_data)
+        elif issue.priority == 3:  # High
+            issues['high'].append(issue_data)
+        elif issue.priority == 2:  # Medium
+            issues['medium'].append(issue_data)
+        elif issue.priority == 1:  # Low
+            issues['low'].append(issue_data)
+    
+    context = {
+        'mapbox_access_token': settings.MAPBOX_ACCESS_TOKEN,
+        'issues': issues
+    }
+    
+    return render(request, 'routermap.html', context)
 
 def issue_detail(request, pk):
     issue = get_object_or_404(AccessibilityIssue, pk=pk)
@@ -67,10 +98,16 @@ def issue_detail(request, pk):
     }
     return render(request, 'issue_detail.html', context)
 
+class StandardResultsSetPagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = 'page_size'
+    max_page_size = 100
+
 class AccessibilityIssueViewSet(viewsets.ModelViewSet):
     queryset = AccessibilityIssue.objects.all()
     serializer_class = AccessibilityIssueSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    pagination_class = StandardResultsSetPagination
 
     def perform_create(self, serializer):
         serializer.save(reported_by=self.request.user)

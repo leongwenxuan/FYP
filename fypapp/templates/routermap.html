@@ -1,10 +1,616 @@
+{% extends 'base.html' %} {% block title %}Route Planner{% endblock %} 
 
-{% extends 'base.html' %}
+{% block extra_head %}
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.10.0/mapbox-gl.css" rel="stylesheet">
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.10.0/mapbox-gl.js"></script>
 
-{% block content %}
+<script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.3/mapbox-gl-geocoder.min.js"></script>
+<link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.3/mapbox-gl-geocoder.css" type="text/css">
 
-<div class="container">
-    <h1>Router Map</h1>
-</div>
+<style>
+    .mapboxgl-ctrl-geocoder {
+        width: 100% !important;
+        max-width: none !important;
+    }
+
+    .mapboxgl-ctrl-geocoder input[type='text'] {
+        width: 100% !important;
+    }
+
+    /* Optional: Match your Bootstrap styling */
+    .mapboxgl-ctrl-geocoder {
+        border: 1px solid #ced4da;
+        border-radius: 0.375rem;
+    }
+
+    .input-group {
+        display: flex;
+        gap: 10px;  
+        width: 100%;
+    }
+
+    .input-group #start-geocoder {
+        flex: 1;  
+        width: 100%;
+    }
+    
+    #start-geocoder, #end-geocoder {
+        width: 100%;
+    }
+    
+    #start-geocoder .mapboxgl-ctrl-geocoder,
+    #end-geocoder .mapboxgl-ctrl-geocoder {
+        width: 100% !important;
+        min-width: 100% !important;
+    }
+
+    .input-group .btn {
+        white-space: nowrap;  
+        height: 40px;  
+        align-self: flex-start;  
+    }
+
+</style>
 
 {% endblock %}
+
+{% block content %}
+<div class="container">
+    <h2 class="mb-4">Elderly-Friendly Route Planner</h2>
+
+  <!-- Input section -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <form id="routeForm">
+                        <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3 location-input">
+                                <label class="form-label">Start Location</label>
+                                <div class="input-group">
+                                    <div id="start-geocoder"></div>
+                                    <button type="button" class="btn btn-secondary" id="useMyLocation">
+                                        <i class="fas fa-location-arrow"></i> Use My Location
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    
+                        <div class="col-md-6">
+                            <div class="mb-3 location-input">
+                                <label class="form-label">End Destination</label>
+                                <div id="end-geocoder"></div>
+                            </div>
+                        </div>
+                        </div>
+
+            <div class="mb-3">
+                <label class="form-label">Consider Issues with Priority:</label>
+            <div class="form-check form-check-inline">
+            <input
+              class="form-check-input"
+              type="checkbox"
+              id="avoidAll"
+              checked
+            />
+            <label class="form-check-label" for="avoidAll">All</label>
+          </div>
+          <div class="form-check form-check-inline">
+            <input
+              class="form-check-input"
+              type="checkbox"
+              id="avoidCritical"
+              checked
+            />
+            <label class="form-check-label" for="avoidCritical">Critical</label>
+          </div>
+          <div class="form-check form-check-inline">
+            <input
+              class="form-check-input"
+              type="checkbox"
+              id="avoidHigh"
+              checked
+            />
+            <label class="form-check-label" for="avoidHigh">High</label>
+          </div>
+          <div class="form-check form-check-inline">
+            <input
+              class="form-check-input"
+              type="checkbox"
+              id="avoidMedium"
+              checked
+            />
+            <label class="form-check-label" for="avoidMedium">Medium</label>
+          </div>
+          <div class="form-check form-check-inline">
+            <input
+              class="form-check-input"
+              type="checkbox"
+              id="avoidLow"
+              checked
+            />
+            <label class="form-check-label" for="avoidLow">Low</label>
+          </div>
+                            </div>
+        <button type="submit" class="btn btn-primary">Find Route</button>
+        </form>
+        </div>
+    </div>
+
+  <!-- Route information section (moved above the map) -->
+  <div class="row mb-3">
+    <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+          <h5 class="card-title">Route Information</h5>
+          <div id="route-info">
+            <div class="row">
+              <div class="col-md-4">
+                <p><i class="fas fa-road"></i> Distance: <span id="route-distance">-</span></p>
+              </div>
+              <div class="col-md-4">
+                <p><i class="fas fa-clock"></i> Duration: <span id="route-duration">-</span></p>
+              </div>
+              <div class="col-md-4">
+                <p><i class="fas fa-exclamation-triangle"></i> Issues Near Route: <span id="route-issues">-</span></p>
+                    </div>
+                </div>
+            <div id="route-warnings" class="mt-2">
+            </div>
+        </div>
+        </div>
+      </div>
+        </div>
+    </div>
+
+  <!-- Map section -->
+  <div class="row">
+    <div class="card">
+      <div class="card-body p-0">
+        <div id="route-map" style="height: 600px; border-radius: 4px"></div>
+                    </div>
+                </div>
+            </div>
+
+  <!-- Removing the original route information section that was below -->
+</div>
+{% endblock %} {% block extra_scripts %}
+<script>
+    let startCoords, endCoords;
+    const accessibilityIssues = {{ issues|safe }};
+
+    mapboxgl.accessToken = "{{ mapbox_access_token }}";
+
+  // First, create the map
+  let map = new mapboxgl.Map({
+    container: "route-map",
+    style: "mapbox://styles/mapbox/streets-v12",
+    center: [103.8198, 1.3521],
+    zoom: 12,
+  });
+
+  // Create geolocate control BEFORE adding it or using it
+  const geolocateControl = new mapboxgl.GeolocateControl({
+    positionOptions: {
+      enableHighAccuracy: true,
+    },
+    trackUserLocation: true,
+    showUserHeading: true,
+  });
+
+  // Add the control to the map
+  map.addControl(geolocateControl);
+
+  // Now we can use the control in the load event
+  map.on('load', () => {
+    const priorityCheckboxes = ['avoidCritical', 'avoidHigh', 'avoidMedium', 'avoidLow'];
+    const allCheckbox = document.getElementById('avoidAll');
+
+
+    geolocateControl.on('geolocate', (position) => {
+        const coords = [position.coords.longitude, position.coords.latitude];
+        startCoords = coords; // Set the global startCoords
+        
+        // Reverse geocode to get address and update the input
+        fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${coords[0]},${coords[1]}.json?access_token=${mapboxgl.accessToken}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.features && data.features.length > 0) {
+                    // Force the geocoder to show the address
+                    startGeocoder.setInput(data.features[0].place_name);
+                }
+            });
+    });
+
+
+    // Handle "All" checkbox
+    allCheckbox.addEventListener('change', (e) => {
+        priorityCheckboxes.forEach(id => {
+            document.getElementById(id).checked = e.target.checked;
+        });
+    });
+
+    // Handle individual checkboxes
+    priorityCheckboxes.forEach(id => {
+        document.getElementById(id).addEventListener('change', () => {
+            const allChecked = priorityCheckboxes.every(boxId => 
+                document.getElementById(boxId).checked
+            );
+            allCheckbox.checked = allChecked;
+        });
+    });
+
+    // Trigger geolocation 
+    geolocateControl.trigger();
+
+    // Create geocoder controls
+    const startGeocoder = new MapboxGeocoder({
+        accessToken: mapboxgl.accessToken,
+        mapboxgl: mapboxgl,
+        placeholder: 'Enter start location',
+        countries: 'SG',
+        marker: {
+            color: '#00FF00' 
+        }
+    });
+
+    const endGeocoder = new MapboxGeocoder({
+        accessToken: mapboxgl.accessToken,
+        mapboxgl: mapboxgl,
+        placeholder: 'Enter destination',
+        countries: 'SG',
+        marker: {
+            color: '#FF0000' // Red for destination
+        }
+    });
+
+
+    // Add geocoders to their respective input containers
+    document.getElementById('start-geocoder').appendChild(startGeocoder.onAdd(map));
+    document.getElementById('end-geocoder').appendChild(endGeocoder.onAdd(map));
+
+    // // Store coordinates when locations are selected
+    startGeocoder.on('result', (e) => {
+        startCoords = e.result.geometry.coordinates;
+    });
+
+    endGeocoder.on('result', (e) => {
+        endCoords = e.result.geometry.coordinates;
+    });
+
+    // Add markers for critical issues
+    accessibilityIssues.critical.forEach(issue => {
+        new mapboxgl.Marker({
+            color: '#dc3545', // red
+            scale: 0.8
+        })
+        .setLngLat(issue.coords)
+        .setPopup(
+            new mapboxgl.Popup({ offset: 25 })
+            .setHTML(`
+                <div>
+                    <h6>${issue.title}</h6>
+                    <p>${issue.description}</p>
+                    <a href="/issues/${issue.id}" class="btn btn-sm btn-primary">View Details</a>
+                </div>
+            `)
+        )
+        .addTo(map);
+    });
+
+    // Add markers for high priority issues
+    accessibilityIssues.high.forEach(issue => {
+        new mapboxgl.Marker({
+            color: '#fd7e14', // orange
+            scale: 0.8
+        })
+        .setLngLat(issue.coords)
+        .setPopup(
+            new mapboxgl.Popup({ offset: 25 })
+            .setHTML(`
+                <div>
+                    <h6>${issue.title}</h6>
+                    <p>${issue.description}</p>
+                    <a href="/issues/${issue.id}" class="btn btn-sm btn-primary">View Details</a>
+                </div>
+            `)
+        )
+        .addTo(map);
+    });
+
+    // Add markers for medium priority issues
+    accessibilityIssues.medium.forEach(issue => {
+        new mapboxgl.Marker({
+            color: '#ffc107', // yellow
+            scale: 0.8
+        })
+        .setLngLat(issue.coords)
+        .setPopup(
+            new mapboxgl.Popup({ offset: 25 })
+            .setHTML(`
+                <div>
+                    <h6>${issue.title}</h6>
+                    <p>${issue.description}</p>
+                    <a href="/issues/${issue.id}" class="btn btn-sm btn-primary">View Details</a>
+                </div>
+            `)
+        )
+        .addTo(map);
+    });
+
+    // Add markers for low priority issues
+    accessibilityIssues.low.forEach(issue => {
+        new mapboxgl.Marker({
+            color: '#28a745', // green
+            scale: 0.8
+        })
+        .setLngLat(issue.coords)
+        .setPopup(
+            new mapboxgl.Popup({ offset: 25 })
+            .setHTML(`
+                <div>
+                    <h6>${issue.title}</h6>
+                    <p>${issue.description}</p>
+                    <a href="/issues/${issue.id}" class="btn btn-sm btn-primary">View Details</a>
+                </div>
+            `)
+        )
+        .addTo(map);
+    });
+  });
+
+
+  document.getElementById('routeForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    if (!startCoords || !endCoords) {
+        alert('Please select both start and end locations');
+        return;
+    }
+
+    // Get points to avoid based on checked priorities
+    let pointsToAvoid = [];
+    if (document.getElementById('avoidCritical').checked) {
+        pointsToAvoid = [...pointsToAvoid, ...accessibilityIssues.critical.map(issue => ({
+            ...issue,
+            priority: 'Critical'
+        }))];
+    }
+    if (document.getElementById('avoidHigh').checked) {
+        pointsToAvoid = [...pointsToAvoid, ...accessibilityIssues.high.map(issue => ({
+            ...issue,
+            priority: 'High'
+        }))];
+    }
+    if (document.getElementById('avoidMedium').checked) {
+        pointsToAvoid = [...pointsToAvoid, ...accessibilityIssues.medium.map(issue => ({
+            ...issue,
+            priority: 'Medium'
+        }))];
+    }
+    if (document.getElementById('avoidLow').checked) {
+        pointsToAvoid = [...pointsToAvoid, ...accessibilityIssues.low.map(issue => ({
+            ...issue,
+            priority: 'Low'
+        }))];
+    }
+
+    try {
+        const query = await fetch(
+            `https://api.mapbox.com/directions/v5/mapbox/walking/${startCoords[0]},${startCoords[1]};${endCoords[0]},${endCoords[1]}?` + 
+            new URLSearchParams({
+                steps: 'true',
+                geometries: 'geojson',
+                alternatives: 'true',
+                access_token: mapboxgl.accessToken
+            })
+        );
+
+        const json = await query.json();
+        
+        if (!json.routes || json.routes.length === 0) {
+            alert('No route found');
+            return;
+        }
+
+        // Function to calculate distance between point and line segment in meters
+        function getDistanceFromLine(point, lineStart, lineEnd) {
+            const lng = point[0];
+            const lat = point[1];
+            const lng1 = lineStart[0];
+            const lat1 = lineStart[1];
+            const lng2 = lineEnd[0];
+            const lat2 = lineEnd[1];
+
+            // Convert to radians
+            const toRad = x => x * Math.PI / 180;
+            const R = 6371000; // Earth's radius in meters
+
+            const φ1 = toRad(lat1);
+            const φ2 = toRad(lat2);
+            const φ3 = toRad(lat);
+            const λ1 = toRad(lng1);
+            const λ2 = toRad(lng2);
+            const λ3 = toRad(lng);
+
+            // Use the Haversine formula
+            const y = Math.sin(λ3 - λ1) * Math.cos(φ3);
+            const x = Math.cos(φ1) * Math.sin(φ3) - Math.sin(φ1) * Math.cos(φ3) * Math.cos(λ3 - λ1);
+            const bearing1 = Math.atan2(y, x);
+
+            const y2 = Math.sin(λ2 - λ1) * Math.cos(φ2);
+            const x2 = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(λ2 - λ1);
+            const bearing2 = Math.atan2(y2, x2);
+
+            const d13 = R * Math.acos(Math.sin(φ1) * Math.sin(φ3) + Math.cos(φ1) * Math.cos(φ3) * Math.cos(λ3 - λ1));
+            const d23 = R * Math.acos(Math.sin(φ2) * Math.sin(φ3) + Math.cos(φ2) * Math.cos(φ3) * Math.cos(λ3 - λ2));
+            const d12 = R * Math.acos(Math.sin(φ1) * Math.sin(φ2) + Math.cos(φ1) * Math.cos(φ2) * Math.cos(λ2 - λ1));
+
+            if (d13 > d12 || d23 > d12) {
+                return Math.min(d13, d23);
+            }
+
+            // Calculate perpendicular distance
+            const cross = Math.sin(bearing2 - bearing1) * d13;
+            return Math.abs(cross);
+        }
+
+        // Analyze each route
+        const scoredRoutes = json.routes.map(route => {
+            const nearbyIssues = [];
+            const coordinates = route.geometry.coordinates;
+
+            // Check each segment of the route
+            for (let i = 0; i < coordinates.length - 1; i++) {
+                pointsToAvoid.forEach(point => {
+                    const distance = getDistanceFromLine(point.coords, coordinates[i], coordinates[i + 1]);
+                    // If issue is within 50 meters of route
+                    if (distance < 50) {
+                        nearbyIssues.push({
+                            id: point.id,
+                            coords: point.coords,
+                            title: point.title,
+                            description: point.description,
+                            priority: point.priority,
+                            distance: Math.round(distance)
+                        });
+                    }
+                });
+            }
+
+            return {
+                route,
+                nearbyIssues,
+                score: nearbyIssues.length
+            };
+        });
+
+        // Sort routes by number of nearby issues
+        scoredRoutes.sort((a, b) => a.score - b.score);
+        const bestRoute = scoredRoutes[0];
+
+        // Update route info display
+        document.getElementById('route-distance').textContent = 
+            `${(bestRoute.route.distance / 1000).toFixed(2)} km`;
+        document.getElementById('route-duration').textContent = 
+            `${Math.round(bestRoute.route.duration / 60)} minutes`;
+        document.getElementById('route-issues').textContent = bestRoute.score;
+
+        // Show detailed warnings if there are issues
+        const warningsDiv = document.getElementById('route-warnings');
+        warningsDiv.innerHTML = '';
+        if (bestRoute.score > 0) {
+            const issuesList = bestRoute.nearbyIssues
+                .map(issue => `<li>${issue.priority} priority issue ${issue.distance}m from route</li>`)
+                .join('');
+            
+            warningsDiv.innerHTML = `
+                <div class="alert ${bestRoute.score > 2 ? 'alert-danger' : 'alert-warning'}">
+                    <strong>Warning:</strong> This route has accessibility issues nearby:
+                    <ul class="mb-0 mt-2">
+                        ${issuesList}
+                    </ul>
+                </div>
+            `;
+        }
+
+        // Add the route to the map
+        if (map.getSource('route')) {
+            map.removeLayer('route');
+            map.removeSource('route');
+        }
+
+        map.addSource('route', {
+            'type': 'geojson',
+            'data': {
+                'type': 'Feature',
+                'properties': {},
+                'geometry': bestRoute.route.geometry
+            }
+        });
+
+        map.addLayer({
+            'id': 'route',
+            'type': 'line',
+            'source': 'route',
+            'layout': {
+                'line-join': 'round',
+                'line-cap': 'round'
+            },
+            'paint': {
+                'line-color': bestRoute.score === 0 ? '#3887be' : 
+                             bestRoute.score <= 2 ? '#ff9800' : '#dc3545',
+                'line-width': 5,
+                'line-opacity': 0.75
+            }
+        });
+
+        // Fit the map to the route
+        const bounds = new mapboxgl.LngLatBounds();
+        bestRoute.route.geometry.coordinates.forEach(coord => {
+            bounds.extend(coord);
+        });
+        map.fitBounds(bounds, { padding: 50 });
+
+        // Create markers for nearby issues
+        bestRoute.nearbyIssues.forEach(issue => {
+            const marker = new mapboxgl.Marker({
+                color: getPriorityColor(issue.priority)
+            })
+            .setLngLat(issue.coords)
+            .setPopup(
+                new mapboxgl.Popup({ offset: 25 })
+                .setHTML(`
+                    <div>
+                        <h6>${issue.title}</h6>
+                        <p>${issue.description}</p>
+                        <p>Distance from route: ${issue.distance}m</p>
+                        <a href="/issues/${issue.id}" class="btn btn-sm btn-primary">View Details</a>
+                    </div>
+                `)
+            )
+            .addTo(map);
+        });
+
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error getting directions');
+    }
+  });
+
+  // Helper functions for marker styling
+  function getPriorityColor(priority) {
+    switch(priority) {
+        case 'Critical':
+            return '#dc3545'; // red
+        case 'High':
+            return '#fd7e14'; // orange
+        case 'Medium':
+            return '#ffc107'; // yellow
+        case 'Low':
+            return '#28a745'; // green
+        default:
+            return '#3887be'; // default blue
+    }
+  }
+
+  function getPriorityBadgeClass(priority) {
+    const classes = {
+        1: 'bg-success',
+        2: 'bg-warning',
+        3: 'bg-orange',
+        4: 'bg-danger'
+    };
+    return classes[priority] || 'bg-success';
+  }
+
+  function getPriorityText(priority) {
+    const text = {
+        1: 'Low',
+        2: 'Medium',
+        3: 'High',
+        4: 'Critical'
+    };
+    return text[priority] || 'Low';
+  }
+</script>
+{% endblock %} 
