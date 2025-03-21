@@ -1,6 +1,6 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from rest_framework import viewsets, status, permissions
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, parser_classes
 from rest_framework.response import Response
 from rest_framework.pagination import PageNumberPagination
 from django.db.models import Count
@@ -19,6 +19,11 @@ from rest_framework import filters
 import django_filters.rest_framework
 from django.db.models import Q
 from django.db import models
+from rest_framework.parsers import MultiPartParser
+import openai
+import os
+import uuid
+import tempfile
 
 def register(request):
     if request.method == 'POST':
@@ -107,6 +112,69 @@ class StandardResultsSetPagination(PageNumberPagination):
     page_size_query_param = 'page_size'
     max_page_size = 100
 
+@api_view(['POST'])
+@parser_classes([MultiPartParser])
+def transcribe_audio(request):
+    if 'audio' not in request.FILES:
+        return Response({'success': False, 'error': 'No audio file provided'}, status=400)
+
+    audio_file = request.FILES['audio']
+
+    try:
+        # Create a unique filename in the media directory
+        temp_dir = os.path.join(settings.MEDIA_ROOT, 'temp_audio')
+        os.makedirs(temp_dir, exist_ok=True)
+        temp_path = os.path.join(temp_dir, f"{uuid.uuid4()}.webm")
+
+        # Save the file
+        with open(temp_path, 'wb+') as destination:
+            for chunk in audio_file.chunks():
+                destination.write(chunk)
+
+        # Process with OpenAI API
+        client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
+
+        # First, transcribe the audio
+        with open(temp_path, 'rb') as audio_file:
+            transcript = client.audio.transcriptions.create(
+                model="whisper-1",
+                file=audio_file
+            )
+
+        # Now, use GPT to extract structured data
+        completion = client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": "Extract the following information from the user's description of an accessibility issue: title, description, location, and priority (1=Low, 2=Medium, 3=High, 4=Critical). Return as JSON."},
+                {"role": "user", "content": transcript.text}
+            ]
+        )
+
+        # Parse the structured data
+        import json
+        try:
+            structured_data = json.loads(completion.choices[0].message.content)
+        except json.JSONDecodeError:
+            # Fallback if not valid JSON
+            structured_data = {
+                "description": transcript.text
+            }
+
+        # Clean up the temp file
+        os.unlink(temp_path)
+
+        return Response({
+            'success': True,
+            'transcript': transcript.text,
+            'result': structured_data
+        })
+
+    except Exception as e:
+        import traceback
+        print(f"Error in transcribe_audio: {str(e)}")
+        print(traceback.format_exc())
+        return Response({'success': False, 'error': str(e)}, status=500)
+
 class AccessibilityIssueViewSet(viewsets.ModelViewSet):
     queryset = AccessibilityIssue.objects.all()
     serializer_class = AccessibilityIssueSerializer
@@ -149,7 +217,7 @@ class AccessibilityIssueViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(reported_by=self.request.user)
-
+        
     @action(detail=True, methods=['POST'], permission_classes=[IsAuthenticated])
     def upvote(self, request, pk=None):
         try:
@@ -201,6 +269,7 @@ class AccessibilityIssueViewSet(viewsets.ModelViewSet):
         ).order_by('-priority', '-vote_count')
         serializer = self.get_serializer(top_issues, many=True)
         return Response(serializer.data)
+    
 
 class IssueCommentViewSet(viewsets.ModelViewSet):
     queryset = IssueComment.objects.all()
