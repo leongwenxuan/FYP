@@ -1,1 +1,3 @@
-web gunicorn fypapp.wsgi:application --log-file -
+ web : gunicorn fypapp.wsgi
+
+
