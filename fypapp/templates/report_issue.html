@@ -9,9 +9,18 @@
 {% block content %}
 <div class="container">
     <h2 class="mb-4">Report Accessibility Issue</h2>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title">Location Preview</h5>
+            <div id="map" style="height: 400px;" class="mb-3"></div>
+            <button type="button" class="btn btn-outline-primary btn-sm" onclick="useCurrentLocation()">
+                <i class="fas fa-location-arrow me-1"></i> Use Current Location
+            </button>
+        </div>
+    </div>
     
     <div class="row">
-        <div class="col-md-8">
             <div class="card">
                 <div class="card-body">
                     <form id="issueForm" enctype="multipart/form-data">
@@ -58,19 +67,6 @@
                         <button type="submit" class="btn btn-primary">Submit Report</button>
                     </form>
                 </div>
-            </div>
-        </div>
-        
-        <div class="col-md-4">
-            <div class="card">
-                <div class="card-body">
-                    <h5 class="card-title">Location Preview</h5>
-                    <div id="map" style="height: 300px;" class="mb-3"></div>
-                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="useCurrentLocation()">
-                        <i class="fas fa-location-arrow me-1"></i> Use Current Location
-                    </button>
-                </div>
-            </div>
         </div>
     </div>
 </div>
@@ -91,6 +87,28 @@ function initMap() {
         zoom: 12
     });
 
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const userLocation = { lat: position.coords.latitude, lng: position.coords.longitude };
+                map.setCenter(userLocation);
+
+                new google.maps.Marker({
+                    position: userLocation,
+                    map: map,
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 10,
+                        fillColor: '#4285F4',
+                        fillOpacity: 1,
+                        strokeColor: '#ffffff',
+                        strokeWeight: 2
+                    },
+                    title: 'Your Location'
+                });
+            }
+        );
+    }
     geocoder = new google.maps.Geocoder(); 
 
     marker = new google.maps.Marker({
