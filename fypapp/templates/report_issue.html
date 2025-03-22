@@ -3,7 +3,10 @@
 {% block title %}Report Issue{% endblock %}
 
 {% block extra_head %}
-<script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&libraries=places"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.10.0/mapbox-gl.css" rel="stylesheet">
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.10.0/mapbox-gl.js"></script>
+<script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.0/mapbox-gl-geocoder.min.js"></script>
+<link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.0/mapbox-gl-geocoder.css" type="text/css">
 {% endblock %}
 
 {% block content %}
@@ -85,111 +88,173 @@ let marker;
 let autocomplete;
 
 function initMap() {
-    // Default to Singapore coordinates
-    const defaultLocation = { lat: 1.3521, lng: 103.8198 };
+    mapboxgl.accessToken = '{{ mapbox_access_token }}';
     
-    map = new google.maps.Map(document.getElementById('map'), {
+    // Default to Singapore coordinates
+    const defaultLocation = [103.8198, 1.3521]; // [lng, lat] for Mapbox
+    
+    map = new mapboxgl.Map({
+        container: 'map',
+        style: 'mapbox://styles/mapbox/streets-v12',
         center: defaultLocation,
         zoom: 12
     });
-
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                const userLocation = { lat: position.coords.latitude, lng: position.coords.longitude };
-                map.setCenter(userLocation);
-
-                new google.maps.Marker({
-                    position: userLocation,
-                    map: map,
-                    icon: {
-                        path: google.maps.SymbolPath.CIRCLE,
-                        scale: 10,
-                        fillColor: '#4285F4',
-                        fillOpacity: 1,
-                        strokeColor: '#ffffff',
-                        strokeWeight: 2
-                    },
-                    title: 'Your Location'
-                });
-            }
-        );
-    }
-    geocoder = new google.maps.Geocoder(); 
-
-    marker = new google.maps.Marker({
-        map: map,
-        draggable: true
+    
+    // Create a draggable marker (but don't add it to the map yet)
+    marker = new mapboxgl.Marker({
+        draggable: true,
+        color: '#FF0000'
     });
-
-    // Initialize the autocomplete
-    autocomplete = new google.maps.places.Autocomplete(
-        document.getElementById('location'),
-        { componentRestrictions: { country: 'sg' } }
-    );
-
-    // Update marker when place is selected
-    autocomplete.addListener('place_changed', () => {
-        const place = autocomplete.getPlace();
-        if (!place.geometry) return;
-
-        updateMarkerPosition(place.geometry.location);
-    });
-
-    // Update coordinates when marker is dragged
-    marker.addListener('dragend', () => {
-        const position = marker.getPosition();
-        updateFormCoordinates(position);
-        reverseGeocode(position);
-    });
-}
-
-function updateMarkerPosition(location) {
-    marker.setPosition(location);
-    map.setCenter(location);
-    map.setZoom(16);
-    updateFormCoordinates(location);
-}
-
-function updateFormCoordinates(location) {
-    document.getElementById('latitude').value = Number(location.lat()).toFixed(6);
-    document.getElementById('longitude').value = Number(location.lng()).toFixed(6);
-}
-
-
-function reverseGeocode(position) {
-    geocoder.geocode({ location: position }, (results, status) => {
-        if (status === 'OK' && results[0]) {
-            document.getElementById('location').value = results[0].formatted_address;
+    
+    // Set up map events after it's loaded
+    map.on('load', function() {
+        console.log("Map loaded successfully");
+        
+        // Add navigation controls
+        map.addControl(new mapboxgl.NavigationControl());
+        
+        // Add marker drag functionality
+        marker.on('dragend', function() {
+            const lngLat = marker.getLngLat();
+            updateFormCoordinates(lngLat);
+            reverseGeocode(lngLat);
+        });
+        
+        // Add click event to the map to place marker
+        map.on('click', function(e) {
+            console.log("Map clicked at:", e.lngLat);
+            updateMarkerPosition(e.lngLat);
+            reverseGeocode(e.lngLat);
+        });
+        
+        // // Add a geocoder search box
+        // const geocoder = new MapboxGeocoder({
+        //     accessToken: mapboxgl.accessToken,
+        //     mapboxgl: mapboxgl,
+        //     marker: false,
+        //     placeholder: 'Search for a location',
+        //     countries: 'sg' // Restrict to Singapore
+        // });
+        
+        // map.addControl(geocoder);
+        
+        // When a result is selected
+        geocoder.on('result', function(e) {
+            console.log("Geocoder result:", e.result);
+            const coordinates = e.result.geometry.coordinates;
+            const lngLat = {
+                lng: coordinates[0],
+                lat: coordinates[1]
+            };
+            
+            updateMarkerPosition(lngLat);
+            document.getElementById('location').value = e.result.place_name;
+        });
+        
+        // Try to get user location
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    console.log("Got user location:", position.coords);
+                    const userLocation = [position.coords.longitude, position.coords.latitude]; // [lng, lat]
+                    map.flyTo({
+                        center: userLocation,
+                        zoom: 15
+                    });
+                    
+                    // Add user location marker (blue dot)
+                    new mapboxgl.Marker({
+                        color: '#4285F4'
+                    })
+                    .setLngLat(userLocation)
+                    .addTo(map);
+                    
+                    // Initialize issue marker at user location
+                    updateMarkerPosition({
+                        lng: position.coords.longitude,
+                        lat: position.coords.latitude
+                    });
+                },
+                (error) => {
+                    console.error("Geolocation error:", error);
+                }
+            );
         }
     });
+    
+    // Add error handling for map load
+    map.on('error', function(e) {
+        console.error("Map error:", e);
+        alert("There was an error loading the map. Please refresh the page and try again.");
+    });
+}
+
+function updateMarkerPosition(lngLat) {
+    console.log("Updating marker position to:", lngLat);
+    
+    // Add or move the marker
+    marker.setLngLat(lngLat).addTo(map);
+    
+    // Center the map on the marker
+    map.flyTo({
+        center: [lngLat.lng, lngLat.lat],
+        zoom: 16
+    });
+    
+    updateFormCoordinates(lngLat);
+}
+
+function updateFormCoordinates(lngLat) {
+    document.getElementById('latitude').value = lngLat.lat.toFixed(6);
+    document.getElementById('longitude').value = lngLat.lng.toFixed(6);
+    console.log("Form coordinates updated:", lngLat.lat.toFixed(6), lngLat.lng.toFixed(6));
+}
+
+function reverseGeocode(lngLat) {
+    console.log("Reverse geocoding:", lngLat);
+    
+    // Use Mapbox Geocoding API
+    fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${lngLat.lng},${lngLat.lat}.json?access_token=${mapboxgl.accessToken}`)
+        .then(response => response.json())
+        .then(data => {
+            console.log("Geocoding response:", data);
+            if (data.features && data.features.length > 0) {
+                document.getElementById('location').value = data.features[0].place_name;
+                console.log("Location set to:", data.features[0].place_name);
+            } else {
+                console.log("No geocoding results found");
+            }
+        })
+        .catch(error => {
+            console.error('Error reverse geocoding:', error);
+        });
 }
 
 function useCurrentLocation() {
+    console.log("Using current location");
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
             position => {
-                const location = {
-                    lat: position.coords.latitude,
-                    lng: position.coords.longitude
+                console.log("Got current position:", position.coords);
+                const lngLat = {
+                    lng: position.coords.longitude,
+                    lat: position.coords.latitude
                 };
                 
                 // Update marker and map
-                updateMarkerPosition(new google.maps.LatLng(location.lat, location.lng));
+                updateMarkerPosition(lngLat);
                 
                 // Get address for the location
-                geocoder.geocode({ location }, (results, status) => {
-                    if (status === 'OK' && results[0]) {
-                        document.getElementById('location').value = results[0].formatted_address;
-                    } else {
-                        console.error('Geocoder failed:', status);
-                        document.getElementById('location').value = `${location.lat}, ${location.lng}`;
-                    }
-                });
+                reverseGeocode(lngLat);
             },
             error => {
                 console.error('Error getting location:', error);
                 alert('Unable to get your location. Please try again or enter it manually.');
+            },
+            {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0
             }
         );
     } else {
@@ -245,7 +310,6 @@ document.getElementById('issueForm').addEventListener('submit', async function(e
     alert('Error submitting issue. Please try again.');
 }
 });
-
 
 // Voice input functionality
 let isRecording = false;
