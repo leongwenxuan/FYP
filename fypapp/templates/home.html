@@ -3,7 +3,8 @@
 {% block title %}Home{% endblock %}
 
 {% block extra_head %}
-<script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&libraries=places"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.10.0/mapbox-gl.css" rel="stylesheet">
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.10.0/mapbox-gl.js"></script>
 {% endblock %}
 
 {% block content %}
@@ -58,57 +59,44 @@ let userMarker;
 let issueMarkers = [];
 
 function initMap() {
+    mapboxgl.accessToken = '{{ mapbox_access_token }}';
+
     // Default to Singapore coordinates
     const defaultLocation = { lat: 1.3521, lng: 103.8198 };
     
-    map = new google.maps.Map(document.getElementById('map'), {
-        center: defaultLocation,
-        zoom: 12,
-        styles: [
-            {
-                featureType: 'poi',
-                elementType: 'labels',
-                stylers: [{ visibility: 'off' }]
-            }
-        ]
+    map = new mapboxgl.Map({
+        container: 'map',
+        style: 'mapbox://styles/mapbox/streets-v12',
+        center: [defaultLocation.lng, defaultLocation.lat], 
+        zoom: 12
     });
 
-    // Try to get user's location
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-            position => {
-                const userLocation = {
-                    lat: position.coords.latitude,
-                    lng: position.coords.longitude
-                };
-                
-                map.setCenter(userLocation);
-                
-                // Add user marker
-                userMarker = new google.maps.Marker({
-                    position: userLocation,
-                    map: map,
-                    icon: {
-                        path: google.maps.SymbolPath.CIRCLE,
-                        scale: 10,
-                        fillColor: '#4285F4',
-                        fillOpacity: 1,
-                        strokeColor: '#ffffff',
-                        strokeWeight: 2
-                    },
-                    title: 'Your Location'
-                });
+    const geolocateControl = new mapboxgl.GeolocateControl({
+        positionOptions: {
+            enableHighAccuracy: true
+        },
+        trackUserLocation: true,
+        showUserHeading: true
+    });
 
-                // Load nearby issues
-                loadNearbyIssues(userLocation.lat, userLocation.lng);
-            },
-            () => {
-                loadNearbyIssues(defaultLocation.lat, defaultLocation.lng);
-            }
-        );
-    }
-
+    // Add the control to the map
+    map.addControl(geolocateControl);
+    
     loadPriorityIssues();
+    
+    map.on('load', () => {
+        geolocateControl.on('geolocate', (position) => {
+
+            const userLat = position.coords.latitude;
+            const userLng = position.coords.longitude;
+
+            loadNearbyIssues(userLat, userLng);
+        });
+
+        setTimeout(() => {
+            geolocateControl.trigger();
+        }, 1000);
+    });
 }
 
 function loadNearbyIssues(lat, lng) {
@@ -119,7 +107,7 @@ function loadNearbyIssues(lat, lng) {
             nearbyList.innerHTML = '';
 
             // Clear existing markers
-            issueMarkers.forEach(marker => marker.setMap(null));
+            issueMarkers.forEach(marker => marker.remove());
             issueMarkers = [];
 
             issues.forEach(issue => {
@@ -137,30 +125,23 @@ function loadNearbyIssues(lat, lng) {
                     </a>
                 `;
 
-                // Add marker to map
-                const marker = new google.maps.Marker({
-                    position: { lat: parseFloat(issue.latitude), lng: parseFloat(issue.longitude) },
-                    map: map,
-                    title: issue.title,
-                    icon: {
-                        url: getPriorityMarkerIcon(issue.priority),
-                        scaledSize: new google.maps.Size(30, 30)
-                    }
-                });
-
-                const infoWindow = new google.maps.InfoWindow({
-                    content: `
+                // Create popup for Mapbox
+                const popup = new mapboxgl.Popup({ offset: 25 })
+                    .setHTML(`
                         <div>
                             <h6>${issue.title}</h6>
                             <p>${issue.description}</p>
                             <a href="/issues/${issue.id}">View Details</a>
                         </div>
-                    `
-                });
+                    `);
 
-                marker.addListener('click', () => {
-                    infoWindow.open(map, marker);
-                });
+                // Add marker to map using Mapbox
+                const marker = new mapboxgl.Marker({
+                    color: getPriorityColor(issue.priority)
+                })
+                .setLngLat([parseFloat(issue.longitude), parseFloat(issue.latitude)])
+                .setPopup(popup)
+                .addTo(map);
 
                 issueMarkers.push(marker);
             });
@@ -211,14 +192,14 @@ function getPriorityBadge(priority) {
     return badges[priority] || '';
 }
 
-function getPriorityMarkerIcon(priority) {
-    const icons = {
-        1: 'https://maps.google.com/mapfiles/ms/icons/green-dot.png',
-        2: 'https://maps.google.com/mapfiles/ms/icons/yellow-dot.png',
-        3: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png',
-        4: 'https://maps.google.com/mapfiles/ms/icons/purple-dot.png'
+function getPriorityColor(priority) {
+    const colors = {
+        1: '#28a745', // green for low
+        2: '#ffc107', // yellow for medium
+        3: '#fd7e14', // orange for high
+        4: '#dc3545'  // red for critical
     };
-    return icons[priority] || icons[1];
+    return colors[priority] || '#28a745';
 }
 
 // Initialize map when page loads

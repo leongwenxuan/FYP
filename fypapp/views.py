@@ -23,7 +23,6 @@ from rest_framework.parsers import MultiPartParser
 import openai
 import os
 import uuid
-import tempfile
 
 def register(request):
     if request.method == 'POST':
@@ -38,21 +37,23 @@ def register(request):
     return render(request, 'registration/register.html', {'form': form})
 
 def home(request):
+    allIssues = AccessibilityIssue.objects.all()
     context = {
-        'google_maps_api_key': settings.GOOGLE_MAPS_API_KEY
+        'mapbox_access_token': settings.MAPBOX_ACCESS_TOKEN,
+        'allIssues': allIssues
     }
     return render(request, 'home.html', context)
 
 @login_required
 def report_issue(request):
     context = {
-        'google_maps_api_key': settings.GOOGLE_MAPS_API_KEY
+        'mapbox_access_token': settings.MAPBOX_ACCESS_TOKEN,
     }
     return render(request, 'report_issue.html', context)
 
 def issue_list(request):
     context = {
-        'google_maps_api_key': settings.GOOGLE_MAPS_API_KEY
+        'mapbox_access_token': settings.MAPBOX_ACCESS_TOKEN
     }
     return render(request, 'issue_list.html', context)
 
@@ -61,6 +62,7 @@ def profile(request):
     upvoted_issues = AccessibilityIssue.objects.filter(upvotes=request.user)    
     return render(request, 'profile.html', {'reported_issues': reported_issues, 'upvoted_issues': upvoted_issues})
 
+@login_required
 def routermap(request):
     issues = {
         'critical': [],
