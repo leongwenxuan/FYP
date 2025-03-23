@@ -15,10 +15,7 @@ from math import cos, radians
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from django.conf import settings
-from rest_framework import filters
-import django_filters.rest_framework
 from django.db.models import Q
-from django.db import models
 from .models import StaffProfile
 from rest_framework.parsers import MultiPartParser
 import openai
@@ -146,7 +143,7 @@ def issue_detail(request, pk):
     
     context = {
         'issue': issue,
-        'google_maps_api_key': settings.GOOGLE_MAPS_API_KEY,
+        'mapbox_access_token': settings.MAPBOX_ACCESS_TOKEN,
         'has_upvoted': has_upvoted
     }
     return render(request, 'issue_detail.html', context)
