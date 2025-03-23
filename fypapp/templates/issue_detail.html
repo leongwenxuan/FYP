@@ -3,11 +3,12 @@
 {% block title %}{{ issue.title }}{% endblock %}
 
 {% block extra_head %}
-<script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.10.0/mapbox-gl.css" rel="stylesheet">
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.10.0/mapbox-gl.js"></script>
 {% endblock %}
 
 {% block content %}
-<div class="container">
+<div class="container-fluid">
     <nav aria-label="breadcrumb" class="mb-4">
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="/">Home</a></li>
@@ -123,22 +124,24 @@ let map;
 let marker;
 
 function initMap() {
+    mapboxgl.accessToken = '{{ mapbox_access_token }}';
+    
     const location = {
         lat: parseFloat('{{ issue.latitude }}'),
         lng: parseFloat('{{ issue.longitude }}')
     };
     
-    map = new google.maps.Map(document.getElementById('map'), {
-        center: location,
+    map = new mapboxgl.Map({
+        container: 'map',
+        style: 'mapbox://styles/mapbox/streets-v12', 
+        center: [location.lng, location.lat],
         zoom: 15
     });
 
-    marker = new google.maps.Marker({
-        position: location,
-        map: map,
-        title: '{{ issue.title }}',
-        icon: getPriorityMarkerIcon({{ issue.priority }})
-    });
+    // Add a marker at the issue location
+    new mapboxgl.Marker()
+        .setLngLat([location.lng, location.lat])
+        .addTo(map);
 
     loadNearbyIssues(location.lat, location.lng);
 }
@@ -215,7 +218,6 @@ async function toggleUpvote() {
 document.getElementById('commentForm')?.addEventListener('submit', async function(e) {
     e.preventDefault();
     
-
     const content = document.getElementById('commentContent').value;
     
     try {
