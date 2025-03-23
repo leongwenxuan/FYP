@@ -1,5 +1,5 @@
 from django import forms
-from .models import StaffProfile, Agency
+from .models import StaffProfile
 
 class StaffProfileForm(forms.ModelForm):
     class Meta:
