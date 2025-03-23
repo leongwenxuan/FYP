@@ -9,7 +9,7 @@
             <div class="card-body">
                 <h2 class="card-title text-center mb-4">Create an Account</h2>
                 
-                <form method="post">
+                <form method="post" id="registrationForm">
                     {% csrf_token %}
                     
                     {% for field in form %}
@@ -27,6 +27,43 @@
                     </div>
                     {% endfor %}
                     
+                    <!-- Toggle for agency staff -->
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="isAgencyStaff" name="is_agency_staff">
+                        <label class="form-check-label" for="isAgencyStaff">I am registering as agency staff</label>
+                    </div>
+                    
+                    <!-- Agency staff fields (hidden by default) -->
+                    <div id="agencyStaffFields" style="display: none;">
+                        <div class="mb-3">
+                            <label for="agency" class="form-label">Agency</label>
+                            <select name="agency" id="agency" class="form-control">
+                                <option value="">Select Agency</option>
+                                {% for agency in agencies %}
+                                    <option value="{{ agency.id }}">{{ agency.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="role" class="form-label">Role</label>
+                            <select name="role" id="role" class="form-control">
+                                <option value="">Select Role</option>
+                                <option value="admin">Agency Admin</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="employee_id" class="form-label">Employee ID</label>
+                            <input type="text" name="employee_id" class="form-control" id="employee_id">
+                            <small class="form-text text-muted">Your official employee ID for verification</small>
+                        </div>
+                        
+                        <div class="alert alert-info">
+                            <small>Your account will need to be verified by your agency administrator before you can access agency features.</small>
+                        </div>
+                    </div>
+                    
                     <div class="d-grid">
                         <button type="submit" class="btn btn-primary">Register</button>
                     </div>
@@ -39,4 +76,26 @@
         </div>
     </div>
 </div>
-{% endblock %} 
+
+{% block extra_scripts %}
+<script>
+    document.getElementById('isAgencyStaff').addEventListener('change', function() {
+        const agencyFields = document.getElementById('agencyStaffFields');
+        if (this.checked) {
+            agencyFields.style.display = 'block';
+            // Make agency staff fields required when checkbox is checked
+            document.getElementById('agency').required = true;
+            document.getElementById('role').required = true;
+            document.getElementById('employee_id').required = true;
+        } else {
+            agencyFields.style.display = 'none';
+            // Remove required when checkbox is unchecked
+            document.getElementById('agency').required = false;
+            document.getElementById('role').required = false;
+            document.getElementById('employee_id').required = false;
+        }
+    });
+</script>
+{% endblock %}
+
+{% endblock %}

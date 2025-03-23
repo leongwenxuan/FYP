@@ -1,0 +1,105 @@
+{% extends 'base.html' %}
+
+{% block title %}Agency Dashboard{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <h1 class="mb-3">Agency Dashboard</h1>
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Welcome, {{ staff_profile.user.username }}</h5>
+                    <h6 class="card-subtitle mb-2 text-muted">{{ staff_profile.get_role_display }} at {{ staff_profile.agency.name }}</h6>
+                    <p>Employee ID: {{ staff_profile.employee_id }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card text-white bg-primary mb-3">
+                <div class="card-body text-center">
+                    <h5 class="card-title">Open Issues</h5>
+                    <p class="card-text display-4">{{ open_count }}</p>
+                    <a href="{% url 'agency_issue_list' %}?status=assigned" class="btn btn-light">View All</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-white bg-warning mb-3">
+                <div class="card-body text-center">
+                    <h5 class="card-title">In Progress</h5>
+                    <p class="card-text display-4">{{ in_progress_count }}</p>
+                    <a href="{% url 'agency_issue_list' %}?status=in_progress" class="btn btn-light">View All</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-white bg-success mb-3">
+                <div class="card-body text-center">
+                    <h5 class="card-title">Completed</h5>
+                    <p class="card-text display-4">{{ completed_count }}</p>
+                    <a href="{% url 'agency_issue_list' %}?status=completed" class="btn btn-light">View All</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Recent Issues</h5>
+                    <a href="{% url 'agency_issue_list' %}" class="btn btn-sm btn-outline-primary">View All Issues</a>
+                </div>
+                <div class="card-body">
+                    {% if assigned_issues %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Title</th>
+                                        <th>Location</th>
+                                        <th>Priority</th>
+                                        <th>Status</th>
+                                        <th>Assigned Date</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for assignment in assigned_issues %}
+                                    <tr>
+                                        <td>{{ assignment.issue.id }}</td>
+                                        <td>{{ assignment.issue.title }}</td>
+                                        <td>{{ assignment.issue.location }}</td>
+                                        <td>
+                                            <span class="badge bg-{% if assignment.issue.priority == 4 %}danger{% elif assignment.issue.priority == 3 %}warning{% elif assignment.issue.priority == 2 %}info{% else %}success{% endif %}">
+                                                {{ assignment.issue.get_priority_display }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-{% if assignment.status == 'assigned' %}secondary{% elif assignment.status == 'in_progress' %}primary{% elif assignment.status == 'completed' %}success{% elif assignment.status == 'under_review' %}info{% elif assignment.status == 'rejected' %}danger{% endif %}">
+                                                {{ assignment.get_status_display }}
+                                            </span>
+                                        </td>
+                                        <td>{{ assignment.assigned_at|date:"M d, Y" }}</td>
+                                        <td>
+                                            <a href="{% url 'agency_issue_detail' assignment.id %}" class="btn btn-sm btn-outline-primary">View</a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="alert alert-info">No issues have been assigned to your agency yet.</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

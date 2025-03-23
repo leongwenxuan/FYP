@@ -68,6 +68,16 @@
                         </div>
 
                         <div class="mb-3">
+                            <label for="agency" class="form-label">Assign to Agency</label>
+                            <select class="form-select" id="agency" name="agency" required>
+                                <option value="">Select agency</option>
+                                {% for agency in agencies %}
+                                    <option value="{{ agency.id }}">{{ agency.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
                             <label for="image" class="form-label">Upload Image (Optional)</label>
                             <input type="file" class="form-control" id="image" name="image" accept="image/*">
                             <div id="imagePreview" class="mt-2"></div>

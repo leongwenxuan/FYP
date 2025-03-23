@@ -72,9 +72,11 @@
                         <label class="form-label">Status</label>
                         <select class="form-select" id="status">
                             <option value="all">All</option>
-                            <option value="Open">Open</option>
-                            <option value="In Progress">In Progress</option>
-                            <option value="Resolved">Resolved</option>
+                            <option value="open">Open</option>
+                            <option value="assigned">Assigned to Agency</option>
+                            <option value="in_progress">In Progress</option>
+                            <option value="resolved">Resolved</option>
+                            <option value="closed">Closed</option>
                         </select>
                     </div>
 
@@ -234,38 +236,38 @@ function addIssueToList(issue) {
     const issueCard = document.createElement('div');
     issueCard.className = 'card mb-3 issue-card';
     issueCard.innerHTML = `
-        <div class="card-body">
-            <div class="d-flex justify-content-between align-items-start">
-                <h5 class="card-title mb-1">
-                    <a href="/issues/${issue.id}" class="text-decoration-none text-dark">
+        <a href="/issues/${issue.id}/" class="text-decoration-none text-dark">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start">
+                    <h5 class="card-title mb-1">
                         ${issue.title}
-                    </a>
-                </h5>
-                <span class="priority-badge">${getPriorityBadge(issue.priority)}</span>
-            </div>
-            
-            <p class="text-muted small mb-2">
-                <i class="fas fa-map-marker-alt me-1"></i>${issue.location}
-            </p>
-            
-            <p class="card-text text-truncate mb-2">${issue.description}</p>
-            
-            <div class="d-flex justify-content-between align-items-center">
-                <div class="text-muted small">
-                    <i class="fas fa-user me-1"></i>${issue.reported_by.username}
-                    <span class="mx-2">•</span>
-                    <i class="fas fa-clock me-1"></i>${timeAgo(new Date(issue.created_at))}
+                    </h5>
+                    <span class="priority-badge">${getPriorityBadge(issue.priority)}</span>
                 </div>
-                <div>
-                    <span class="me-3">
-                        <i class="fas fa-thumbs-up me-1"></i>${issue.upvote_count}
-                    </span>
-                    <span class="badge ${getStatusBadgeClass(issue.status)}">
-                        ${issue.status}
-                    </span>
+                
+                <p class="text-muted small mb-2">
+                    <i class="fas fa-map-marker-alt me-1"></i>${issue.location}
+                </p>
+                
+                <p class="card-text text-truncate mb-2">${issue.description}</p>
+                
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="text-muted small">
+                        <i class="fas fa-user me-1"></i>${issue.reported_by.username}
+                        <span class="mx-2">•</span>
+                        <i class="fas fa-clock me-1"></i>${timeAgo(new Date(issue.created_at))}
+                    </div>
+                    <div>
+                        <span class="me-3">
+                            <i class="fas fa-thumbs-up me-1"></i>${issue.upvote_count}
+                        </span>
+                        <span class="badge ${getStatusBadgeClass(issue.status)}">
+                            ${issue.status}
+                        </span>
+                    </div>
                 </div>
             </div>
-        </div>
+        </a>
     `;
     
     issuesList.appendChild(issueCard);
@@ -320,13 +322,14 @@ function getPriorityColor(priority) {
 
 function getStatusBadgeClass(status) {
     const classes = {
-        'Open': 'bg-danger',
-        'In Progress': 'bg-warning text-dark',
-        'Resolved': 'bg-success'
+        'open': 'bg-danger',
+        'assigned': 'bg-warning text-dark',
+        'in_progress': 'bg-info',
+        'resolved': 'bg-success',
+        'closed': 'bg-secondary'
     };
     return classes[status] || 'bg-secondary';
 }
-
 function timeAgo(date) {
     const seconds = Math.floor((new Date() - date) / 1000);
     
