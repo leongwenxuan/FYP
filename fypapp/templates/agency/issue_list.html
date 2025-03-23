@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+
+{% block title %}Agency Issues{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1>Assigned Issues</h1>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="{% url 'agency_dashboard' %}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+            </a>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Filter Issues</h5>
+        </div>
+        <div class="card-body">
+            <div class="btn-group mb-3" role="group" aria-label="Status filter">
+                <a href="{% url 'agency_issue_list' %}" class="btn btn-outline-primary {% if not status_filter %}active{% endif %}">All</a>
+                <a href="{% url 'agency_issue_list' %}?status=assigned" class="btn btn-outline-primary {% if status_filter == 'assigned' %}active{% endif %}">Assigned</a>
+                <a href="{% url 'agency_issue_list' %}?status=in_progress" class="btn btn-outline-primary {% if status_filter == 'in_progress' %}active{% endif %}">In Progress</a>
+                <a href="{% url 'agency_issue_list' %}?status=under_review" class="btn btn-outline-primary {% if status_filter == 'under_review' %}active{% endif %}">Under Review</a>
+                <a href="{% url 'agency_issue_list' %}?status=completed" class="btn btn-outline-primary {% if status_filter == 'completed' %}active{% endif %}">Completed</a>
+                <a href="{% url 'agency_issue_list' %}?status=rejected" class="btn btn-outline-primary {% if status_filter == 'rejected' %}active{% endif %}">Rejected</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">Issues 
+                {% if status_filter %}
+                    <span class="badge bg-secondary">Status: {{ status_filter|title }}</span>
+                {% endif %}
+            </h5>
+        </div>
+        <div class="card-body">
+            {% if assigned_issues %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Title</th>
+                                <th>Location</th>
+                                <th>Priority</th>
+                                <th>Status</th>
+                                <th>Assigned To</th>
+                                <th>Assigned Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for assignment in assigned_issues %}
+                            <tr>
+                                <td>{{ assignment.issue.id }}</td>
+                                <td>{{ assignment.issue.title }}</td>
+                                <td>{{ assignment.issue.location }}</td>
+                                <td>
+                                    <span class="badge bg-{% if assignment.issue.priority == 4 %}danger{% elif assignment.issue.priority == 3 %}warning{% elif assignment.issue.priority == 2 %}info{% else %}success{% endif %}">
+                                        {{ assignment.issue.get_priority_display }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-{% if assignment.status == 'assigned' %}secondary{% elif assignment.status == 'in_progress' %}primary{% elif assignment.status == 'completed' %}success{% elif assignment.status == 'under_review' %}info{% elif assignment.status == 'rejected' %}danger{% endif %}">
+                                        {{ assignment.get_status_display }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if assignment.assigned_to %}
+                                        {{ assignment.assigned_to.user.username }}
+                                    {% else %}
+                                        <span class="text-muted">Unassigned</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ assignment.assigned_at|date:"M d, Y" }}</td>
+                                <td>
+                                    <a href="{% url 'agency_issue_detail' assignment.id %}" class="btn btn-sm btn-outline-primary">View</a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="alert alert-info">No issues match the selected criteria.</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

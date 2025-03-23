@@ -16,16 +16,34 @@
                 <li class="nav-item">
                     <a class="nav-link" href="/">Home</a>
                 </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="/issues">Issues</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="/report">Report Issue</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="/routermap">Route Map</a>
-                </li>
-
+                
+                {% if user.is_authenticated %}
+                    {% if user.staff_profile %}
+                        <!-- Agency Staff Navigation -->
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'agency_dashboard' %}">Dashboard</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'agency_issue_list' %}">Assigned Issues</a>
+                        </li>
+                    {% else %}
+                        <!-- Regular User Navigation -->
+                        <li class="nav-item">
+                            <a class="nav-link" href="/issues">Issues</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/report">Report Issue</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/routermap">Route Map</a>
+                        </li>
+                    {% endif %}
+                {% else %}
+                    <!-- Non-authenticated User Navigation -->
+                    <li class="nav-item">
+                        <a class="nav-link" href="/issues">Issues</a>
+                    </li>
+                {% endif %}
             </ul>
             <div class="navbar-nav">
                 {% if user.is_authenticated %}

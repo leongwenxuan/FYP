@@ -1,0 +1,38 @@
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">Update Status</h5>
+    </div>
+    <div class="card-body">
+        <form action="{% url 'update_issue_status' assignment.id %}" method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            
+            <div class="mb-3">
+                <label for="status" class="form-label">New Status</label>
+                <select class="form-select" id="status" name="status" required>
+                    <option value="">Select new status</option>
+                    {% for status_value, status_label in assignment.STATUS_CHOICES %}
+                        <option value="{{ status_value }}" {% if assignment.status == status_value %}selected{% endif %}>
+                            {{ status_label }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="mb-3">
+                <label for="note" class="form-label">Status Update Note</label>
+                <textarea class="form-control" id="note" name="note" rows="4" required 
+                          placeholder="Provide details about this status update..."></textarea>
+            </div>
+             
+            <div class="mb-3">
+                <label for="photo_evidence" class="form-label">Photo Evidence (optional)</label>
+                <input type="file" class="form-control" id="photo_evidence" name="photo_evidence" accept="image/*">
+                <div class="form-text">Upload a photo to document the status change.</div>
+            </div>
+            
+            <div class="d-grid gap-2">
+                <button type="submit" class="btn btn-primary">Update Status</button>
+            </div>
+        </form>
+    </div>
+</div>

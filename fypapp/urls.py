@@ -40,4 +40,11 @@ urlpatterns = [
     path('login/', auth_views.LoginView.as_view(template_name='registration/login.html'), name='login'),
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),
     path('register/', views.register, name='register'),
+    # Agency staff URLs
+    path('agency/dashboard/', views.agency_dashboard, name='agency_dashboard'),
+    path('agency/issues/', views.agency_issue_list, name='agency_issue_list'),
+    path('agency/issues/<int:assignment_id>/', views.agency_issue_detail, name='agency_issue_detail'),
+    path('agency/issues/<int:assignment_id>/update/', views.update_issue_status, name='update_issue_status'),
+    path('register/staff/', views.register_agency_staff, name='register_staff'), 
+    path('agency/issues/<int:assignment_id>/assign/', views.assign_issue, name='assign_issue'),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

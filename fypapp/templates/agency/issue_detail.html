@@ -1,0 +1,232 @@
+{% extends 'base.html' %}
+
+{% block title %}Issue Details{% endblock %}
+
+{% block extra_head %}
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.10.0/mapbox-gl.css" rel="stylesheet">
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.10.0/mapbox-gl.js"></script>
+<style>
+    .status-timeline {
+        position: relative;
+        padding-left: 30px;
+    }
+    .status-timeline::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0;
+        height: 100%;
+        width: 2px;
+        background-color: #dee2e6;
+    }
+    .status-item {
+        position: relative;
+        margin-bottom: 25px;
+    }
+    .status-item::before {
+        content: '';
+        position: absolute;
+        left: -38px;
+        top: 0;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background-color: #ffffff;
+        border: 2px solid #0d6efd;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'agency_dashboard' %}">Dashboard</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'agency_issue_list' %}">Issues</a></li>
+                    <li class="breadcrumb-item active">Issue #{{ issue.id }}</li>
+                </ol>
+            </nav>
+            <h1>{{ issue.title }}</h1>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="{% url 'agency_issue_list' %}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Back to Issues
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Issue Details</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-4 fw-bold">Status:</div>
+                        <div class="col-md-8">
+                            <span class="badge bg-{% if assignment.status == 'assigned' %}secondary{% elif assignment.status == 'in_progress' %}primary{% elif assignment.status == 'completed' %}success{% elif assignment.status == 'under_review' %}info{% elif assignment.status == 'rejected' %}danger{% endif %}">
+                                {{ assignment.get_status_display }}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-4 fw-bold">Priority:</div>
+                        <div class="col-md-8">
+                            <span class="badge bg-{% if issue.priority == 4 %}danger{% elif issue.priority == 3 %}warning{% elif issue.priority == 2 %}info{% else %}success{% endif %}">
+                                {{ issue.get_priority_display }}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-4 fw-bold">Location:</div>
+                        <div class="col-md-8">{{ issue.location }}</div>
+                    </div>
+                    <div class="row mb-4">
+                        <div class="col-md-4 fw-bold">Reported By:</div>
+                        <div class="col-md-8">{{ issue.reported_by.username }} on {{ issue.created_at|date:"F d, Y" }}</div>
+                    </div>
+                    
+                    <h6 class="fw-bold">Description:</h6>
+                    <p>{{ issue.description }}</p>
+
+                    {% if issue.image %}
+                    <h6 class="fw-bold mt-4">Attached Image:</h6>
+                    <div class="mt-2">
+                        <img src="{{ issue.image.url }}" alt="Issue Image" class="img-fluid rounded">
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Location</h5>
+                </div>
+                <div class="card-body">
+                    <div id="map" style="height: 300px;" data-lat="{{ issue.latitude }}" data-lng="{{ issue.longitude }}"></div>
+                </div>
+            </div>
+            {% include 'agency/status_update_form.html' %}
+
+            {% if user.staff_profile.role == 'admin' %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Assign Issue</h5>
+                </div>
+                <div class="card-body">
+                    <form action="{% url 'assign_issue' assignment.id %}" method="post">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label for="staff_id" class="form-label">Assign to Staff Member</label>
+                            <select class="form-select" id="staff_id" name="staff_id" required>
+                                <option value="">Select staff member</option>
+                                {% for staff in agency_staff %}
+                                    <option value="{{ staff.id }}" {% if assignment.assigned_to == staff %}selected{% endif %}>
+                                        {{ staff.user.username }} ({{ staff.get_role_display }})
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary">Assign Issue</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Assignment Details</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-5 fw-bold">Assigned:</div>
+                        <div class="col-md-7">{{ assignment.assigned_at|date:"F d, Y" }}</div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-5 fw-bold">Last Update:</div>
+                        <div class="col-md-7">{{ assignment.updated_at|date:"F d, Y" }}</div>
+                    </div>
+                    {% if assignment.assigned_to %}
+                    <div class="row mb-3">
+                        <div class="col-md-5 fw-bold">Assigned To:</div>
+                        <div class="col-md-7">{{ assignment.assigned_to.user.username }}</div>
+                    </div>
+                    {% endif %}
+                    {% if assignment.estimated_completion %}
+                    <div class="row mb-3">
+                        <div class="col-md-5 fw-bold">Est. Completion:</div>
+                        <div class="col-md-7">{{ assignment.estimated_completion|date:"F d, Y" }}</div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Status Updates</h5>
+                </div>
+                <div class="card-body">
+                    {% if status_updates %}
+                        <div class="status-timeline">
+                            {% for update in status_updates %}
+                                <div class="status-item">
+                                    <h6>
+                                        <span class="badge bg-{% if update.status == 'assigned' %}secondary{% elif update.status == 'in_progress' %}primary{% elif update.status == 'completed' %}success{% elif update.status == 'under_review' %}info{% elif update.status == 'rejected' %}danger{% endif %}">
+                                            {{ update.get_status_display }}
+                                        </span>
+                                    </h6>
+                                    <p class="text-muted small">{{ update.created_at|date:"F d, Y - h:i A" }}</p>
+                                    <p>{{ update.note }}</p>
+                                    {% if update.photo_evidence %}
+                                        <div class="mt-2 mb-3">
+                                            <a href="{{ update.photo_evidence.url }}" target="_blank">
+                                                <img src="{{ update.photo_evidence.url }}" alt="Status Update Evidence" class="img-fluid rounded" style="max-height: 150px;">
+                                            </a>
+                                        </div>
+                                    {% endif %}
+                                    <p class="text-muted small">Updated by {{ update.created_by.user.username }}</p>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="alert alert-info">No status updates have been made yet.</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize map
+        mapboxgl.accessToken = '{{ mapbox_access_token }}';
+        const mapElement = document.getElementById('map');
+        const lat = parseFloat(mapElement.dataset.lat);
+        const lng = parseFloat(mapElement.dataset.lng);
+        
+        const map = new mapboxgl.Map({
+            container: 'map',
+            style: 'mapbox://styles/mapbox/streets-v11',
+            center: [lng, lat],
+            zoom: 15
+        });
+        
+        // Add marker at issue location
+        new mapboxgl.Marker()
+            .setLngLat([lng, lat])
+            .addTo(map);
+            
+        // Add navigation controls
+        map.addControl(new mapboxgl.NavigationControl());
+    });
+</script>
+{% endblock %}
