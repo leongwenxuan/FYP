@@ -137,17 +137,6 @@ function initMap() {
             reverseGeocode(e.lngLat);
         });
         
-        // // Add a geocoder search box
-        // const geocoder = new MapboxGeocoder({
-        //     accessToken: mapboxgl.accessToken,
-        //     mapboxgl: mapboxgl,
-        //     marker: false,
-        //     placeholder: 'Search for a location',
-        //     countries: 'sg' // Restrict to Singapore
-        // });
-        
-        // map.addControl(geocoder);
-        
         // When a result is selected
         geocoder.on('result', function(e) {
             console.log("Geocoder result:", e.result);

@@ -186,7 +186,10 @@ def transcribe_audio(request):
         completion = client.chat.completions.create(
             model="gpt-4",
             messages=[
-                {"role": "system", "content": "Extract the following information from the user's description of an accessibility issue: title, description, location, and priority (1=Low, 2=Medium, 3=High, 4=Critical). Return as JSON."},
+                {
+                    "role": "system", 
+                    "content": "Extract the following information from the user's description of an accessibility issue: title, description, location, and priority (1=Low, 2=Medium, 3=High, 4=Critical). Return as JSON."
+                },
                 {"role": "user", "content": transcript.text}
             ]
         )
