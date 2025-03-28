@@ -14,6 +14,7 @@ from pathlib import Path
 import os
 from dotenv import load_dotenv
 import django_heroku
+import sys
 
 load_dotenv()
 
@@ -124,7 +125,9 @@ USE_TZ = True
 STATIC_URL = 'static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATICFILES_DIRS = (os.path.join(BASE_DIR, 'static'),)
-django_heroku.settings(locals())
+
+if 'test' not in sys.argv:
+    django_heroku.settings(locals())
 
 # Media files (User uploaded files)
 MEDIA_URL = '/media/'
