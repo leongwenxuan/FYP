@@ -12,7 +12,7 @@ jobs:
     strategy:
       max-parallel: 4
       matrix:
-        python-version: [3.9]  # Adjust as needed
+        python-version: [3.9]
 
     steps:
     - uses: actions/checkout@v3
@@ -26,12 +26,11 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
     
-    - name: Run Specific Tests
+    - name: Run Tests
+      env:
+        SECRET_KEY: ${{ secrets.SECRET_KEY }}
+        GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+        DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        MAPBOX_ACCESS_TOKEN: ${{ secrets.MAPBOX_ACCESS_TOKEN }}
       run: |
-        # Run all tests in the tests directory
         python manage.py test fypapp.tests
-        
-        # Or run specific test files
-        # python manage.py test fypapp.tests.test_api
-        # python manage.py test fypapp.tests.test_create_issue
-        # python manage.py test fypapp.tests.test_views
