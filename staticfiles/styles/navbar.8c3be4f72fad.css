@@ -1,0 +1,66 @@
+.navbar {
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  padding: 0.5rem 0;
+  background: linear-gradient(to right, #2c3e50, #4a69bd) !important;
+}
+
+.navbar-brand {
+  font-size: 1.4rem;
+  font-weight: 600;
+}
+
+.nav-link {
+  position: relative;
+  padding: 0.5rem 1rem !important;
+  transition: color 0.2s;
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+
+.nav-link:hover {
+  color: #fff !important;
+}
+
+.nav-link:after {
+  content: "";
+  position: absolute;
+  width: 0;
+  height: 2px;
+  bottom: 0;
+  left: 50%;
+  background-color: #ff9e00;
+  transition: all 0.3s;
+}
+
+.nav-link:hover:after {
+  width: 80%;
+  left: 10%;
+}
+
+.navbar-nav .nav-link.active {
+  color: #fff !important;
+}
+
+.navbar-nav .nav-link.active:after {
+  width: 80%;
+  left: 10%;
+}
+
+.navbar-nav .nav-item.nav-link {
+  margin: 0 0.5rem;
+}
+
+.bg-transparent.nav-link {
+  cursor: pointer;
+}
+
+.bg-transparent.nav-link:hover {
+  text-decoration: underline;
+}
+
+.navbar-toggler {
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.navbar-toggler-icon {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' width='30' height='30' viewBox='0 0 30 30'%3e%3cpath stroke='rgba(255, 255, 255, 0.85)' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
+}

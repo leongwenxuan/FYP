@@ -5,7 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ReportEase - {% block title %}{% endblock %}</title>
     {% load static %}
+    {% if debug %}
     <link rel="icon" href="{% static 'images/logo.ico' %}" type="image/x-icon">
+    {% endif %}
     {% load bootstrap5 %}
     {% bootstrap_css %}
     {% bootstrap_javascript %}

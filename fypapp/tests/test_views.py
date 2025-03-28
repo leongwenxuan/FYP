@@ -1,7 +1,18 @@
 from django.test import TestCase, Client
 from django.urls import reverse
-from fypapp.model_factories import AccessibilityIssueFactory, UserFactory, AgencyFactory
-from fypapp.models import AccessibilityIssue
+from fypapp.model_factories import AccessibilityIssueFactory, UserFactory
+from django.test import override_settings
+import os
+from django.test import TestCase, override_settings
+from django.conf import settings
+
+BASE_DIR = settings.BASE_DIR  
+
+@override_settings(
+    STATICFILES_DIRS=[os.path.join(BASE_DIR, 'static')],
+    STATIC_URL='/static/',
+    STATIC_ROOT=os.path.join(BASE_DIR, 'staticfiles')
+)
 
 class IssueViewTestCase(TestCase):
     def setUp(self):
